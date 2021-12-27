@@ -40,13 +40,14 @@ namespace tinydhcpd
         server_ip = convert_network_byte_array_to_uint32(buffer + SERVER_IP_OFFSET);
 
         std::copy(buffer + CLIENT_HWADDR_OFFSET, buffer + SERVER_HOSTNAME_OFFSET - 1, hw_addr);
-
-        if (ntohl(*(uint32_t*)buffer + MAGIC_COOKIE_OFFSET) != DHCP_MAGIC_COOKIE)
+        uint32_t cookie = ntohl(*(uint32_t*)(buffer + MAGIC_COOKIE_OFFSET));
+        if (cookie != DHCP_MAGIC_COOKIE)
         {
+            std::cout << cookie << " expected " << DHCP_MAGIC_COOKIE << std::endl;
             throw std::runtime_error("Not a DHCP message!");
         }
 
-        std::copy(buffer + OPTIONS_OFFSET, buffer + buflen - 1, options.begin());
+        std::vector<uint8_t> options(buffer + OPTIONS_OFFSET, buffer + buflen - OPTIONS_OFFSET);
     }
 
     uint16_t convert_network_byte_array_to_uint16(uint8_t* array)
