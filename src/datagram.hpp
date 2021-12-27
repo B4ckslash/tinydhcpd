@@ -5,7 +5,7 @@
 
 namespace tinydhcpd
 {
-    struct dhcp_datagram
+    struct DhcpDatagram
     {
         uint8_t opcode;
         uint8_t hwaddr_type;

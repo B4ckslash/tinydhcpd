@@ -27,7 +27,7 @@ namespace tinydhcpd
         Socket(const std::string if_name, SocketObserver &observer);
         Socket(const struct in_addr &listen_address, SocketObserver &observer);
         ~Socket()noexcept;
-        void send_datagram(dhcp_datagram &datagram);
+        void send_datagram(DhcpDatagram &datagram);
         void recv_loop();
     };
 

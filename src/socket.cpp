@@ -9,10 +9,6 @@ namespace tinydhcpd
 {
     Socket::Socket(const struct in_addr &listen_address, SocketObserver &observer) : observer(observer)
     {
-        std::cout << listen_address.s_addr << std::endl;
-
-        std::printf("listen address: %s\n", inet_ntoa(listen_address));
-
         create_socket();
         const struct sockaddr_in inet_socket_address = {
             .sin_family = AF_INET,
@@ -22,10 +18,12 @@ namespace tinydhcpd
         {
             die("Failed to bind socket: ");
         }
+        setup_epoll();
     }
 
     Socket::Socket(const std::string iface_name, SocketObserver &observer) : observer(observer)
     {
+        std::cout << "Binding to interface: " << iface_name << std::endl;
         create_socket();
         struct ifreq ireq;
         memset(&ireq, 0, sizeof(ireq));
@@ -37,6 +35,7 @@ namespace tinydhcpd
             msg.append(": ");
             die(msg);
         }
+        setup_epoll();
     }
 
     Socket::~Socket()
