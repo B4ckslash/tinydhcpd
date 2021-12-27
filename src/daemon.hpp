@@ -6,8 +6,6 @@
 
 #include <iostream>
 
-#include <libconfig.h++>
-
 #include "socket_observer.hpp"
 
 namespace tinydhcpd
