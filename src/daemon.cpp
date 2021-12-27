@@ -25,6 +25,7 @@ namespace tinydhcpd
 
     void Daemon::handle_recv(DhcpDatagram& datagram)
     {
-        printf("handle_recv");
+        printf("handle_recv\n");
+        printf("%hhn\n", datagram.hw_addr);
     }
 } // namespace tinydhcpd

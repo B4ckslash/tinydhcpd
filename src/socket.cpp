@@ -13,7 +13,8 @@ namespace tinydhcpd
         const struct sockaddr_in inet_socket_address = {
             .sin_family = AF_INET,
             .sin_port = htons(PORT),
-            .sin_addr = listen_address };
+            .sin_addr = listen_address,
+            .sin_zero = {} };
         if (bind(socket_fd, (const sockaddr*)&inet_socket_address, sizeof(inet_socket_address)) == -1)
         {
             die("Failed to bind socket: ");
