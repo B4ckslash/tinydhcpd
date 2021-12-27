@@ -2,6 +2,8 @@
 
 #include "socket.hpp"
 
+#include <netinet/in.h>
+
 #include <iostream>
 
 #include <libconfig.h++>
@@ -16,7 +18,7 @@ namespace tinydhcpd
         Socket socket;
 
     public:
-        Daemon(uint32_t listen_address);
+        Daemon(const struct in_addr &listen_address);
         Daemon(const std::string &iface_name);
         virtual ~Daemon() {}
         virtual void handle_recv(dhcp_datagram &datagram) override;

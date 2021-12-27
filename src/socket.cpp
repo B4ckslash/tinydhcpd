@@ -1,20 +1,23 @@
 #include "socket.hpp"
 
-#include <netinet/in.h>
 #include <net/if.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
 
-
 namespace tinydhcpd
 {
-    Socket::Socket(uint32_t listen_address, SocketObserver &observer) : observer(observer)
+    Socket::Socket(const struct in_addr &listen_address, SocketObserver &observer) : observer(observer)
     {
+        std::cout << listen_address.s_addr << std::endl;
+
+        std::printf("listen address: %s\n", inet_ntoa(listen_address));
+
         create_socket();
         const struct sockaddr_in inet_socket_address = {
             .sin_family = AF_INET,
             .sin_port = htons(PORT),
-            .sin_addr.s_addr = htonl(listen_address)};
+            .sin_addr = listen_address};
         if (bind(socket_fd, (const sockaddr *)&inet_socket_address, sizeof(inet_socket_address)) == -1)
         {
             die("Failed to bind socket: ");

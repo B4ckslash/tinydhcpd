@@ -1,10 +1,13 @@
 #include <iostream>
+#include <arpa/inet.h>
 #include <getopt.h>
 #include "daemon.hpp"
 
 int main(int argc, char *argv[])
 {
-    uint32_t addr = (uint8_t)10 << 24 + (uint8_t)1 << 16 + uint8_t(200) << 8 + 1;
+    struct in_addr addr;
+    inet_aton("10.1.200.1", &addr); 
+    std::cout << addr.s_addr << std::endl;
     tinydhcpd::Daemon daemon(addr);
     tinydhcpd::Daemon daemon_iface(std::string("eth0"));
     std::cout << "finished" << std::endl;

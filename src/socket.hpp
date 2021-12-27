@@ -1,6 +1,7 @@
 #pragma once
 
 #include <sys/epoll.h>
+#include <netinet/in.h>
 
 #include <iostream>
 
@@ -24,8 +25,8 @@ namespace tinydhcpd
 
     public:
         Socket(const std::string if_name, SocketObserver &observer);
-        Socket(uint32_t listen_address, SocketObserver &observer);
-        ~Socket() noexcept;
+        Socket(const struct in_addr &listen_address, SocketObserver &observer);
+        ~Socket()noexcept;
         void send_datagram(dhcp_datagram &datagram);
         void recv_loop();
     };
