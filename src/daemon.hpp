@@ -1,21 +1,25 @@
-#ifndef DAEMON_HPP
-#define DAEMON_HPP
-#include <iostream>
-#include <libconfig.h++>
+#pragma once
 
 #include "socket.hpp"
 
+#include <iostream>
+
+#include <libconfig.h++>
+
+#include "socket_observer.hpp"
+
 namespace tinydhcpd
 {
-    class Daemon 
+    class Daemon : SocketObserver
     {
-        private:
-            Socket socket;
+    private:
+        Socket socket;
 
-        public:
-            Daemon(uint8_t listen_address[4]);
-            Daemon(const std::string& iface_name);
+    public:
+        Daemon(uint32_t listen_address);
+        Daemon(const std::string &iface_name);
+        virtual ~Daemon() {}
+        virtual void handle_recv(dhcp_datagram &datagram) override;
     };
 
 } // namespace tinydhcpd
-#endif

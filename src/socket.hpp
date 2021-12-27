@@ -1,47 +1,33 @@
-#ifndef SOCKET_HPP
-#define SOCKET_HPP
+#pragma once
+
+#include <sys/epoll.h>
+
 #include <iostream>
-#include <vector>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netinet/udp.h>
+
+#include "datagram.hpp"
+#include "socket_observer.hpp"
 
 #define PORT 67
-
+#define MAX_EVENTS 10
 
 namespace tinydhcpd
 {
-    struct dhcp_datagram
-    {
-        uint8_t opcode;
-        uint8_t hwaddr_type;
-        uint8_t hwaddr_len;
-
-        uint8_t transaction_id[4];
-        uint8_t secs_passed[2];
-        uint8_t flags[2];
-
-        uint8_t client_ip[4];
-        uint8_t my_ip[4];
-        uint8_t next_server_ip[4];
-
-        uint8_t hw_addr[16];
-        std::string server_name;
-
-        std::string boot_file_name;
-        std::vector<uint8_t> options;
-    };
-
     class Socket
     {
     private:
+        int socket_fd, epoll_fd;
+        struct epoll_event ev, events[MAX_EVENTS];
+        SocketObserver &observer;
+        void die(std::string error_msg);
+        void create_socket();
+        void setup_epoll();
+
     public:
-        Socket(std::string if_name){}
-        Socket(uint8_t listen_address[4]){}
+        Socket(const std::string if_name, SocketObserver &observer);
+        Socket(uint32_t listen_address, SocketObserver &observer);
+        ~Socket() noexcept;
+        void send_datagram(dhcp_datagram &datagram);
+        void recv_loop();
     };
 
-    dhcp_datagram recv_datagram();
-    void send_datagram(dhcp_datagram &datagram);
-
 } // namespace tinydhcpd
-#endif

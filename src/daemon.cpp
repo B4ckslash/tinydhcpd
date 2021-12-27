@@ -1,14 +1,24 @@
 #include "daemon.hpp"
 
+#include <arpa/inet.h>
+
 namespace tinydhcpd
 {
-    Daemon::Daemon(uint8_t listen_address[4]) : socket{listen_address}
+    Daemon::Daemon(uint32_t listen_address) : socket{listen_address, *this}
     {
-        std::printf("listen address: %u.%u.%u.%u\n", listen_address[0], listen_address[1], listen_address[2], listen_address[3]);
+        struct in_addr ip_addr =
+            {
+                .s_addr = listen_address};
+
+        std::printf("listen address: %s\n", inet_ntoa(ip_addr));
     }
 
-    Daemon::Daemon(const std::string& iface_name) : socket{iface_name}
+    Daemon::Daemon(const std::string &iface_name) : socket{iface_name, *this}
     {
         std::cout << "bind to iface: " << iface_name << std::endl;
+    }
+
+    void Daemon::handle_recv(dhcp_datagram &datagram)
+    {
     }
 } // namespace tinydhcpd
