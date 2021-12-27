@@ -18,16 +18,16 @@ namespace tinydhcpd
     private:
         int socket_fd, epoll_fd;
         struct epoll_event ev, events[MAX_EVENTS];
-        SocketObserver &observer;
+        SocketObserver& observer;
         void die(std::string error_msg);
         void create_socket();
         void setup_epoll();
 
     public:
-        Socket(const std::string if_name, SocketObserver &observer);
-        Socket(const struct in_addr &listen_address, SocketObserver &observer);
+        Socket(const std::string if_name, SocketObserver& observer);
+        Socket(const struct in_addr& listen_address, SocketObserver& observer);
         ~Socket()noexcept;
-        void send_datagram(DhcpDatagram &datagram);
+        void send_datagram(DhcpDatagram& datagram);
         void recv_loop();
     };
 

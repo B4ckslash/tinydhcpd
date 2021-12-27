@@ -3,10 +3,10 @@
 #include <getopt.h>
 #include "daemon.hpp"
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     struct in_addr addr;
-    inet_aton("10.1.1.49", &addr); 
+    inet_aton("10.1.1.49", &addr);
     std::cout << addr.s_addr << std::endl;
     tinydhcpd::Daemon daemon(addr);
     tinydhcpd::Daemon daemon_iface(std::string("enp40s0.1"));

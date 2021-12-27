@@ -7,28 +7,28 @@
 
 namespace tinydhcpd
 {
-    Socket::Socket(const struct in_addr &listen_address, SocketObserver &observer) : observer(observer)
+    Socket::Socket(const struct in_addr& listen_address, SocketObserver& observer) : observer(observer)
     {
         create_socket();
         const struct sockaddr_in inet_socket_address = {
             .sin_family = AF_INET,
             .sin_port = htons(PORT),
-            .sin_addr = listen_address};
-        if (bind(socket_fd, (const sockaddr *)&inet_socket_address, sizeof(inet_socket_address)) == -1)
+            .sin_addr = listen_address };
+        if (bind(socket_fd, (const sockaddr*)&inet_socket_address, sizeof(inet_socket_address)) == -1)
         {
             die("Failed to bind socket: ");
         }
         setup_epoll();
     }
 
-    Socket::Socket(const std::string iface_name, SocketObserver &observer) : observer(observer)
+    Socket::Socket(const std::string iface_name, SocketObserver& observer) : observer(observer)
     {
         std::cout << "Binding to interface: " << iface_name << std::endl;
         create_socket();
         struct ifreq ireq;
         memset(&ireq, 0, sizeof(ireq));
         snprintf(ireq.ifr_name, sizeof(ireq.ifr_name), iface_name.c_str());
-        if (setsockopt(socket_fd, SOL_SOCKET, SO_BINDTODEVICE, (const void *)&ireq, sizeof(ireq)) < 0)
+        if (setsockopt(socket_fd, SOL_SOCKET, SO_BINDTODEVICE, (const void*)&ireq, sizeof(ireq)) < 0)
         {
             std::string msg("Failed to bind to interface ");
             msg.append(iface_name);
