@@ -5,6 +5,10 @@
 #include <unistd.h>
 #include <string.h>
 
+#include <algorithm>
+
+#define DGRAM_SIZE 576
+
 namespace tinydhcpd
 {
     Socket::Socket(const struct in_addr& listen_address, SocketObserver& observer) : observer(observer)
@@ -27,7 +31,7 @@ namespace tinydhcpd
         std::cout << "Binding to interface: " << iface_name << std::endl;
         create_socket();
         struct ifreq ireq;
-        memset(&ireq, 0, sizeof(ireq));
+        std::fill(&ireq, &ireq + sizeof(ireq), 0);
         snprintf(ireq.ifr_name, sizeof(ireq.ifr_name), iface_name.c_str());
         if (setsockopt(socket_fd, SOL_SOCKET, SO_BINDTODEVICE, (const void*)&ireq, sizeof(ireq)) < 0)
         {
@@ -71,6 +75,31 @@ namespace tinydhcpd
         if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, socket_fd, &ev) == -1)
         {
             die("Failed at epoll_ctl: ");
+        }
+    }
+
+    void Socket::recv_loop()
+    {
+        int number_ready_fds;
+        uint8_t raw_data_buffer[DGRAM_SIZE];
+        std::fill(raw_data_buffer, raw_data_buffer + DGRAM_SIZE, (uint8_t)0);
+        while (true)
+        {
+            number_ready_fds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
+            if (number_ready_fds == -1)
+            {
+                die("epoll_wait failed: ");
+            }
+            for (int n = 0; n < number_ready_fds; n++)
+            {
+                if (events[n].data.fd == socket_fd)
+                {
+                    recv(socket_fd, raw_data_buffer, DGRAM_SIZE, MSG_WAITALL);
+                    DhcpDatagram datagram(raw_data_buffer, DGRAM_SIZE);
+                    observer.handle_recv(datagram);
+                    std::fill(raw_data_buffer, raw_data_buffer + DGRAM_SIZE, (uint8_t)0);
+                }
+            }
         }
     }
 } //namespace tinydhcpd
