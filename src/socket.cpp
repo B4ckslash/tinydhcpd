@@ -7,10 +7,14 @@
 
 #include <algorithm>
 
+#include "daemon.hpp"
+
 #define DGRAM_SIZE 576
 
 namespace tinydhcpd
 {
+    bool Socket::should_terminate;
+
     Socket::Socket(const struct in_addr& listen_address, SocketObserver& observer) : observer(observer)
     {
         create_socket();
@@ -28,10 +32,8 @@ namespace tinydhcpd
 
     Socket::Socket(const std::string iface_name, SocketObserver& observer) : observer(observer)
     {
-        std::cout << "Binding to interface: " << iface_name << std::endl;
         create_socket();
-        struct ifreq ireq;
-        std::fill(&ireq, &ireq + sizeof(ireq), 0);
+        struct ifreq ireq = {};
         snprintf(ireq.ifr_name, sizeof(ireq.ifr_name), iface_name.c_str());
         if (setsockopt(socket_fd, SOL_SOCKET, SO_BINDTODEVICE, (const void*)&ireq, sizeof(ireq)) < 0)
         {
@@ -85,9 +87,19 @@ namespace tinydhcpd
         std::fill(raw_data_buffer, raw_data_buffer + DGRAM_SIZE, (uint8_t)0);
         while (true)
         {
+            if (should_terminate)
+            {
+                return;
+            }
+
             number_ready_fds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
             if (number_ready_fds == -1)
             {
+                if (errno == EINTR)
+                {
+                    continue;
+                }
+
                 die("epoll_wait failed: ");
             }
             for (int n = 0; n < number_ready_fds; n++)
@@ -101,5 +113,10 @@ namespace tinydhcpd
                 }
             }
         }
+    }
+
+    void Socket::signal_termination()
+    {
+        should_terminate = true;
     }
 } //namespace tinydhcpd

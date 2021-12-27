@@ -26,4 +26,7 @@ namespace tinydhcpd
 
         DhcpDatagram(uint8_t *buffer, int buflen);
     };
+
+    uint16_t convert_network_byte_array_to_uint16(uint8_t* array);
+    uint32_t convert_network_byte_array_to_uint32(uint8_t* array);
 } // namespace tinydhcpd

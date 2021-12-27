@@ -25,6 +25,8 @@ namespace tinydhcpd
 {
     DhcpDatagram::DhcpDatagram(uint8_t* buffer, int buflen)
     {
+        using namespace tinydhcpd;
+
         opcode = buffer[OPCODE_OFFSET];
         hwaddr_type = buffer[HWADDR_TYPE_OFFSET];
         hwaddr_len = buffer[HWADDR_LENGTH_OFFSET];
@@ -44,7 +46,7 @@ namespace tinydhcpd
             throw std::runtime_error("Not a DHCP message!");
         }
 
-        std::copy(buffer + OPTIONS_OFFSET, buffer + buflen - 1, options);
+        std::copy(buffer + OPTIONS_OFFSET, buffer + buflen - 1, options.begin());
     }
 
     uint16_t convert_network_byte_array_to_uint16(uint8_t* array)

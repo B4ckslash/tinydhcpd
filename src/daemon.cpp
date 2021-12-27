@@ -1,10 +1,12 @@
 #include "daemon.hpp"
 
+
 namespace tinydhcpd
 {
     Daemon::Daemon(const struct in_addr& listen_address)
         try : socket{ listen_address, *this }
     {
+        socket.recv_loop();
     }
     catch (std::runtime_error& ex)
     {
@@ -26,6 +28,6 @@ namespace tinydhcpd
     void Daemon::handle_recv(DhcpDatagram& datagram)
     {
         printf("handle_recv\n");
-        printf("%hhn\n", datagram.hw_addr);
+        printf("%d\n", datagram.hw_addr[0]);
     }
 } // namespace tinydhcpd
