@@ -50,6 +50,11 @@ namespace tinydhcpd
         std::vector<uint8_t> options(buffer + OPTIONS_OFFSET, buffer + buflen - OPTIONS_OFFSET);
     }
 
+    std::vector<uint8_t> DhcpDatagram::to_byte_vector()
+    {
+        return std::vector<uint8_t>();
+    }
+
     uint16_t convert_network_byte_array_to_uint16(uint8_t* array)
     {
         return ntohs(*(uint16_t*)array);

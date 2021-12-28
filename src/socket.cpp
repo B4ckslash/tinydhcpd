@@ -14,7 +14,8 @@
 namespace tinydhcpd
 {
     Socket::Socket(const struct in_addr& address, SocketObserver& observer) : observer(observer),
-        listen_address{ .sin_family = AF_INET, .sin_port = htons(PORT), .sin_addr = address, .sin_zero = {} }
+        listen_address{ .sin_family = AF_INET, .sin_port = htons(PORT), .sin_addr = address, .sin_zero = {} },
+        send_queue()
     {
         create_socket();
         bind_to_address(listen_address);
@@ -22,7 +23,8 @@ namespace tinydhcpd
     }
 
     Socket::Socket(const struct in_addr& address, const std::string& iface_name, SocketObserver& observer) : observer(observer),
-        listen_address{ .sin_family = AF_INET, .sin_port = htons(PORT), .sin_addr = address, .sin_zero = {} }
+        listen_address{ .sin_family = AF_INET, .sin_port = htons(PORT), .sin_addr = address, .sin_zero = {} },
+        send_queue()
     {
         create_socket();
         bind_to_iface(iface_name);
@@ -80,7 +82,7 @@ namespace tinydhcpd
         {
             die("Failed to create epoll file descriptor: ");
         }
-        ev.events = EPOLLIN;
+        ev.events = EPOLLIN | EPOLLOUT;
         ev.data.fd = socket_fd;
         if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, socket_fd, &ev) == -1)
         {
@@ -95,15 +97,16 @@ namespace tinydhcpd
         std::fill(raw_data_buffer, raw_data_buffer + DGRAM_SIZE, (uint8_t)0);
         while (true)
         {
+            if (tinydhcpd::last_signal == SIGINT || tinydhcpd::last_signal == SIGTERM)
+            {
+                return;
+            }
+
             number_ready_fds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
             if (number_ready_fds == -1)
             {
                 if (errno == EINTR)
                 {
-                    if (tinydhcpd::last_signal == SIGINT || tinydhcpd::last_signal == SIGTERM)
-                    {
-                        return;
-                    }
                     continue;
                 }
 
@@ -111,14 +114,33 @@ namespace tinydhcpd
             }
             for (int n = 0; n < number_ready_fds; n++)
             {
-                if (events[n].data.fd == socket_fd)
+                if ((events[n].events & EPOLLIN) > 0)
                 {
-                    recv(socket_fd, raw_data_buffer, DGRAM_SIZE, MSG_WAITALL);
+                    if (recv(socket_fd, raw_data_buffer, DGRAM_SIZE, MSG_WAITALL) < 0)
+                    {
+                        continue;
+                    }
                     DhcpDatagram datagram(raw_data_buffer, DGRAM_SIZE);
                     observer.handle_recv(datagram);
                     std::fill(raw_data_buffer, raw_data_buffer + DGRAM_SIZE, (uint8_t)0);
                 }
+                else if ((events[n].events & EPOLLOUT) > 0 && !send_queue.empty())
+                {
+                    struct sockaddr dst = send_queue.front().first;
+                    std::vector byte_datagram = send_queue.front().second.to_byte_vector();
+                    size_t datagram_size = byte_datagram.size();
+                    if (sendto(socket_fd, byte_datagram.data(), datagram_size, MSG_DONTWAIT, &dst, sizeof(dst)) < 0)
+                    {
+                        continue;
+                    }
+                    send_queue.pop();
+                }
             }
         }
+    }
+
+    void Socket::enqueue_datagram(struct sockaddr& destination, DhcpDatagram& datagram)
+    {
+        send_queue.push(std::make_pair(destination, datagram));
     }
 } //namespace tinydhcpd

@@ -4,6 +4,8 @@
 #include <netinet/in.h>
 
 #include <iostream>
+#include <queue>
+#include <utility>
 
 #include "datagram.hpp"
 #include "socket_observer.hpp"
@@ -20,6 +22,7 @@ namespace tinydhcpd
         struct epoll_event ev, events[MAX_EVENTS];
         SocketObserver& observer;
         const struct sockaddr_in listen_address;
+        std::queue<std::pair<struct sockaddr, DhcpDatagram>> send_queue;
         void die(std::string error_msg);
         void create_socket();
         void bind_to_iface(std::string iface_name);
@@ -31,7 +34,7 @@ namespace tinydhcpd
         Socket(const struct in_addr& address, SocketObserver& observer);
         Socket(const struct in_addr& address, const std::string& iface_name, SocketObserver& observer);
         ~Socket()noexcept;
-        void send_datagram(DhcpDatagram& datagram);
+        void enqueue_datagram(struct sockaddr& destination, DhcpDatagram& datagram);
         void recv_loop();
     };
 
