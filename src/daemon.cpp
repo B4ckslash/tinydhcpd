@@ -3,8 +3,10 @@
 
 namespace tinydhcpd
 {
-    Daemon::Daemon(const struct in_addr& listen_address)
-        try : socket{ listen_address, *this }
+    volatile std::sig_atomic_t last_signal;
+
+    Daemon::Daemon(const struct in_addr& address)
+        try : socket{ address, *this }
     {
         socket.recv_loop();
     }

@@ -5,11 +5,13 @@
 #include <netinet/in.h>
 
 #include <iostream>
+#include <csignal>
 
 #include "socket_observer.hpp"
 
 namespace tinydhcpd
 {
+    extern volatile std::sig_atomic_t last_signal;
     class Daemon : SocketObserver
     {
     private:

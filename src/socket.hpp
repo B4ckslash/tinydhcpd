@@ -17,7 +17,6 @@ namespace tinydhcpd
     {
     private:
         int socket_fd, epoll_fd;
-        static bool should_terminate;
         struct epoll_event ev, events[MAX_EVENTS];
         SocketObserver& observer;
         const struct sockaddr_in listen_address;
@@ -34,7 +33,6 @@ namespace tinydhcpd
         ~Socket()noexcept;
         void send_datagram(DhcpDatagram& datagram);
         void recv_loop();
-        static void signal_termination();
     };
 
 } // namespace tinydhcpd

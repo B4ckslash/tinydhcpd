@@ -2,20 +2,22 @@
 
 #include <iostream>
 #include <csignal>
+#include <cstring>
 
 #include "daemon.hpp"
 #include "socket.hpp"
 
 void sighandler(int signum)
 {
-    std::cout << "Caught signal " << signum << std::endl;
-    tinydhcpd::Socket::signal_termination();
+    std::cout << "Caught SIG" << sigabbrev_np(signum) << std::endl;
+    tinydhcpd::last_signal = signum;
 }
 
 int main()
 {
-    signal(SIGINT, sighandler);
-    signal(SIGTERM, sighandler);
+    std::signal(SIGINT, sighandler);
+    std::signal(SIGTERM, sighandler);
+    std::signal(SIGHUP, sighandler);
 
     struct in_addr addr;
     inet_aton("0.0.0.0", &addr);

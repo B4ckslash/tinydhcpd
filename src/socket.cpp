@@ -95,16 +95,15 @@ namespace tinydhcpd
         std::fill(raw_data_buffer, raw_data_buffer + DGRAM_SIZE, (uint8_t)0);
         while (true)
         {
-            if (should_terminate)
-            {
-                return;
-            }
-
             number_ready_fds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
             if (number_ready_fds == -1)
             {
                 if (errno == EINTR)
                 {
+                    if (tinydhcpd::last_signal == SIGINT || tinydhcpd::last_signal == SIGTERM)
+                    {
+                        return;
+                    }
                     continue;
                 }
 
@@ -121,10 +120,5 @@ namespace tinydhcpd
                 }
             }
         }
-    }
-
-    void Socket::signal_termination()
-    {
-        should_terminate = true;
     }
 } //namespace tinydhcpd
