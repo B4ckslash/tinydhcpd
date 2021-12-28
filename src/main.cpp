@@ -18,9 +18,8 @@ int main()
     signal(SIGTERM, sighandler);
 
     struct in_addr addr;
-    inet_aton("127.0.0.1", &addr);
-    std::cout << addr.s_addr << std::endl;
-    tinydhcpd::Daemon daemon(addr);
+    inet_aton("0.0.0.0", &addr);
+    tinydhcpd::Daemon daemon(addr, "lo");
     std::cout << "finished" << std::endl;
     return 0;
 }

@@ -13,37 +13,24 @@
 
 namespace tinydhcpd
 {
-    bool Socket::should_terminate;
-
-    Socket::Socket(const struct in_addr& listen_address, SocketObserver& observer) : observer(observer)
+    Socket::Socket(const struct in_addr& address, SocketObserver& observer) : observer(observer),
+        listen_address{ .sin_family = AF_INET, .sin_port = htons(PORT), .sin_addr = address, .sin_zero = {} }
     {
         create_socket();
-        const struct sockaddr_in inet_socket_address = {
-            .sin_family = AF_INET,
-            .sin_port = htons(PORT),
-            .sin_addr = listen_address,
-            .sin_zero = {} };
-        if (bind(socket_fd, (const sockaddr*)&inet_socket_address, sizeof(inet_socket_address)) == -1)
-        {
-            die("Failed to bind socket: ");
-        }
+        bind_to_address(listen_address);
         setup_epoll();
     }
 
-    Socket::Socket(const std::string iface_name, SocketObserver& observer) : observer(observer)
+    Socket::Socket(const struct in_addr& address, const std::string& iface_name, SocketObserver& observer) : observer(observer),
+        listen_address{ .sin_family = AF_INET, .sin_port = htons(PORT), .sin_addr = address, .sin_zero = {} }
     {
         create_socket();
-        struct ifreq ireq = {};
-        snprintf(ireq.ifr_name, sizeof(ireq.ifr_name), iface_name.c_str());
-        if (setsockopt(socket_fd, SOL_SOCKET, SO_BINDTODEVICE, (const void*)&ireq, sizeof(ireq)) < 0)
-        {
-            std::string msg("Failed to bind to interface ");
-            msg.append(iface_name);
-            msg.append(": ");
-            die(msg);
-        }
+        bind_to_iface(iface_name);
+        bind_to_address(listen_address);
         setup_epoll();
     }
+
+    Socket::Socket(const std::string& iface_name, SocketObserver& observer) : Socket({ .s_addr = INADDR_ANY }, iface_name, observer) {}
 
     Socket::~Socket()
     {
@@ -62,6 +49,27 @@ namespace tinydhcpd
         if (socket_fd == -1)
         {
             die("Failed to create socket: ");
+        }
+    }
+
+    void Socket::bind_to_iface(const std::string iface_name)
+    {
+        struct ifreq ireq = {};
+        snprintf(ireq.ifr_name, sizeof(ireq.ifr_name), iface_name.c_str());
+        if (setsockopt(socket_fd, SOL_SOCKET, SO_BINDTODEVICE, (const void*)&ireq, sizeof(ireq)) < 0)
+        {
+            std::string msg("Failed to bind to interface ");
+            msg.append(iface_name);
+            msg.append(": ");
+            die(msg);
+        }
+    }
+
+    void Socket::bind_to_address(const struct sockaddr_in& address)
+    {
+        if (bind(socket_fd, (const sockaddr*)&address, sizeof(address)) == -1)
+        {
+            die("Failed to bind socket: ");
         }
     }
 

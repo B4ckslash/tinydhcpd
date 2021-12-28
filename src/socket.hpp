@@ -20,13 +20,17 @@ namespace tinydhcpd
         static bool should_terminate;
         struct epoll_event ev, events[MAX_EVENTS];
         SocketObserver& observer;
+        const struct sockaddr_in listen_address;
         void die(std::string error_msg);
         void create_socket();
+        void bind_to_iface(std::string iface_name);
+        void bind_to_address(const struct sockaddr_in& address);
         void setup_epoll();
 
     public:
-        Socket(const std::string if_name, SocketObserver& observer);
-        Socket(const struct in_addr& listen_address, SocketObserver& observer);
+        Socket(const std::string& iface_name, SocketObserver& observer);
+        Socket(const struct in_addr& address, SocketObserver& observer);
+        Socket(const struct in_addr& address, const std::string& iface_name, SocketObserver& observer);
         ~Socket()noexcept;
         void send_datagram(DhcpDatagram& datagram);
         void recv_loop();

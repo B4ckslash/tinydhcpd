@@ -16,8 +16,9 @@ namespace tinydhcpd
         Socket socket;
 
     public:
-        Daemon(const struct in_addr& listen_address);
+        Daemon(const struct in_addr& address);
         Daemon(const std::string& iface_name);
+        Daemon(const struct in_addr& adress, const std::string& iface_name);
         virtual ~Daemon() {}
         virtual void handle_recv(DhcpDatagram& datagram) override;
     };
