@@ -34,7 +34,7 @@ namespace tinydhcpd
         Socket(const struct in_addr& address, SocketObserver& observer);
         Socket(const struct in_addr& address, const std::string& iface_name, SocketObserver& observer);
         ~Socket()noexcept;
-        void enqueue_datagram(struct sockaddr& destination, DhcpDatagram& datagram);
+        void enqueue_datagram(struct sockaddr &destination, DhcpDatagram& datagram);
         void recv_loop();
     };
 

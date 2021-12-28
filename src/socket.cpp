@@ -5,8 +5,6 @@
 #include <unistd.h>
 #include <string.h>
 
-#include <algorithm>
-
 #include "daemon.hpp"
 
 #define DGRAM_SIZE 576
