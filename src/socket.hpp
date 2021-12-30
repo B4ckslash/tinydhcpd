@@ -30,8 +30,6 @@ namespace tinydhcpd
         void setup_epoll();
 
     public:
-        Socket(const std::string& iface_name, SocketObserver& observer);
-        Socket(const struct in_addr& address, SocketObserver& observer);
         Socket(const struct in_addr& address, const std::string& iface_name, SocketObserver& observer);
         ~Socket()noexcept;
         void enqueue_datagram(struct sockaddr &destination, DhcpDatagram& datagram);

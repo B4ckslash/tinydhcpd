@@ -11,26 +11,18 @@
 
 namespace tinydhcpd
 {
-    Socket::Socket(const struct in_addr& address, SocketObserver& observer) : observer(observer),
-        listen_address{ .sin_family = AF_INET, .sin_port = htons(PORT), .sin_addr = address, .sin_zero = {} },
-        send_queue()
-    {
-        create_socket();
-        bind_to_address(listen_address);
-        setup_epoll();
-    }
-
     Socket::Socket(const struct in_addr& address, const std::string& iface_name, SocketObserver& observer) : observer(observer),
         listen_address{ .sin_family = AF_INET, .sin_port = htons(PORT), .sin_addr = address, .sin_zero = {} },
         send_queue()
     {
         create_socket();
-        bind_to_iface(iface_name);
+        if (!iface_name.empty())
+        {
+            bind_to_iface(iface_name);
+        }
         bind_to_address(listen_address);
         setup_epoll();
     }
-
-    Socket::Socket(const std::string& iface_name, SocketObserver& observer) : Socket({ .s_addr = INADDR_ANY }, iface_name, observer) {}
 
     Socket::~Socket()
     {
