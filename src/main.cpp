@@ -2,14 +2,13 @@
 
 #include <iostream>
 #include <csignal>
-#include <cstring>
 
 #include "daemon.hpp"
 #include "socket.hpp"
 
 void sighandler(int signum)
 {
-    std::cout << "Caught SIG" << sigabbrev_np(signum) << std::endl;
+    std::cout << "Caught signal " << signum << std::endl;
     tinydhcpd::last_signal = signum;
 }
 
