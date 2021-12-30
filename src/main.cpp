@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <getopt.h>
+#include <libconfig.h++>
 
 #include <iostream>
 #include <csignal>
