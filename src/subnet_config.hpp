@@ -1,6 +1,7 @@
 #pragma once
 
 #include <netinet/in.h>
+#include <net/ethernet.h>
 #include <linux/if_packet.h>
 
 #include <vector>
@@ -16,7 +17,7 @@ namespace tinydhcpd
         struct in_addr range_end; 
         struct in_addr netmask;
 
-        std::vector<std::pair<struct sockaddr_ll, struct in_addr>> fixed_hosts;
+        std::vector<std::pair<struct ether_addr, struct in_addr>> fixed_hosts;
         std::vector<DhcpOption> defined_options;
     };
 } // namespace tinydhcpd

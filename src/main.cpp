@@ -66,7 +66,7 @@ int main(int argc, char* const argv[])
 
     try
     {
-        tinydhcpd::parseConfiguration(optval);
+        tinydhcpd::parse_configuration(optval);
     }
     catch (libconfig::ParseException& pex)
     {

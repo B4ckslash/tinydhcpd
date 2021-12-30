@@ -1,6 +1,7 @@
 #include "configuration.hpp"
 
 #include <arpa/inet.h>
+#include <netinet/ether.h>
 #include <libconfig.h++>
 
 #include <string>
@@ -9,9 +10,9 @@
 
 namespace tinydhcpd
 {
-    void parseConfiguration(option_values& optval)
+    void parse_configuration(option_values& optval)
     {
-        using namespace libconfig;
+        using ::libconfig::Setting, ::libconfig::Config;
         Config configuration;
 
         configuration.readFile(optval.confpath);
@@ -51,7 +52,12 @@ namespace tinydhcpd
 
         check_net_range(subnet_cfg);
 
-        //TODO parse hosts and options
+        if (subnet_parsed_cfg.exists(HOSTS_KEY))
+        {
+            parse_hosts(subnet_parsed_cfg, subnet_cfg);
+        }
+
+        //TODO parse options
 
         optval.subnet_config = subnet_cfg;
     }
@@ -59,6 +65,7 @@ namespace tinydhcpd
     void check_net_range(SubnetConfiguration& cfg)
     {
         in_addr_t netmasked_network_address = cfg.subnet_address.s_addr & cfg.netmask.s_addr;
+        //TODO fix logging
         if ((cfg.range_start.s_addr & cfg.netmask.s_addr) != netmasked_network_address)
         {
             throw std::invalid_argument(string_format("Either the range start or the net address is invalid! Netaddr: %s | Range start %s",
@@ -71,4 +78,40 @@ namespace tinydhcpd
         }
     }
 
+    void parse_hosts(libconfig::Setting& subnet_block, SubnetConfiguration& subnet_cfg)
+    {
+        using ::libconfig::Setting, ::libconfig::SettingIterator;
+
+        Setting& hosts_config = subnet_block.lookup(HOSTS_KEY);
+        for (SettingIterator iter = hosts_config.begin(); iter != hosts_config.end(); iter++)
+        {
+            Setting& currentGroup = *iter;
+            std::string config_ether_addr, config_fixed_address;
+            if (currentGroup.lookupValue(HOSTS_ETHER_HWADDR_KEY, config_ether_addr) && currentGroup.lookupValue(HOSTS_FIXED_ADDRESS_KEY, config_fixed_address))
+            {
+                ether_addr* parsed_ether_addr = ether_aton(config_ether_addr.c_str());
+                in_addr parsed_ip4_addr = {};
+                in_addr_t netmasked_subnet_address = subnet_cfg.subnet_address.s_addr & subnet_cfg.netmask.s_addr;
+
+                if (parsed_ether_addr == nullptr)
+                {
+                    std::cerr << "Invalid MAC address in hosts list: " << config_ether_addr << std::endl;
+                    continue;
+                }
+                if (inet_aton(config_fixed_address.c_str(), &parsed_ip4_addr) == 0)
+                {
+                    std::cerr << "Invalid fixed address in hosts list: " << config_fixed_address << std::endl;
+                    continue;
+                }
+                if((parsed_ip4_addr.s_addr & subnet_cfg.netmask.s_addr) != netmasked_subnet_address)
+                {
+                    std::cerr << "Address is not in subnet: " << config_fixed_address << std::endl;
+                    continue;
+                }
+
+                std::cout << "Read pair of " << config_ether_addr << " & " << config_fixed_address << std::endl;
+                subnet_cfg.fixed_hosts.push_back({ *parsed_ether_addr, parsed_ip4_addr });
+            }
+        }
+    }
 } // namespace tinydhcpd

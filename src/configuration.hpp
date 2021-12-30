@@ -1,4 +1,5 @@
 #include <netinet/in.h>
+#include <libconfig.h++>
 
 #include <iostream>
 
@@ -15,6 +16,9 @@ namespace tinydhcpd
     const std::string OPTIONS_KEY = "options";
     const std::string HOSTS_KEY = "hosts";
 
+    const std::string HOSTS_ETHER_HWADDR_KEY = "ether";
+    const std::string HOSTS_FIXED_ADDRESS_KEY = "fixed-address";
+
     struct option_values {
         struct in_addr address;
         std::string interface;
@@ -22,6 +26,7 @@ namespace tinydhcpd
         tinydhcpd::SubnetConfiguration subnet_config;
     };
 
-    void parseConfiguration(option_values& optval);
+    void parse_configuration(option_values& optval);
     void check_net_range(SubnetConfiguration& cfg);
+    void parse_hosts(libconfig::Setting& subnet_block, SubnetConfiguration& subnet_cfg);
 } // namespace tinydhcpd
