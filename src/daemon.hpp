@@ -8,6 +8,7 @@
 #include <csignal>
 
 #include "socket_observer.hpp"
+#include "subnet_config.hpp"
 
 namespace tinydhcpd
 {
@@ -16,11 +17,10 @@ namespace tinydhcpd
     {
     private:
         Socket socket;
+        SubnetConfiguration netconfig;
 
     public:
-        Daemon(const struct in_addr& listen_address);
-        Daemon(const std::string& iface_name);
-        Daemon(const struct in_addr& adress, const std::string& iface_name);
+        Daemon(const struct in_addr& address, const std::string& iface_name, SubnetConfiguration& netconfig);
         virtual ~Daemon() {}
         virtual void handle_recv(DhcpDatagram& datagram) override;
     };

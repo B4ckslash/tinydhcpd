@@ -5,6 +5,13 @@
 
 namespace tinydhcpd
 {
+    struct DhcpOption
+    {
+        uint8_t tag;
+        uint8_t length;
+        std::vector<uint8_t> value;
+    };
+
     struct DhcpDatagram
     {
         uint8_t opcode;
@@ -22,7 +29,7 @@ namespace tinydhcpd
 
         uint8_t hw_addr[16];
 
-        std::vector<uint8_t> options;
+        std::vector<DhcpOption> options;
 
         DhcpDatagram(uint8_t *buffer, int buflen);
 

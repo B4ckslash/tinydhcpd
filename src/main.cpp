@@ -7,9 +7,18 @@
 
 #include "daemon.hpp"
 #include "socket.hpp"
+#include "configuration.hpp"
 
-#define ADDRESS_OPTION_TAG 'a'
-#define IFACE_OPTION_TAG 'i'
+const char ADDRESS_OPTION_TAG = 'a';
+const char IFACE_OPTION_TAG = 'i';
+const char CONFIG_FILE_OPTION_TAG = 'c';
+
+const struct option long_options[] = {
+    { "address", required_argument, nullptr, ADDRESS_OPTION_TAG},
+    { "interface", required_argument, nullptr, IFACE_OPTION_TAG},
+    { "configfile", required_argument, nullptr, CONFIG_FILE_OPTION_TAG},
+    { nullptr, 0, nullptr, 0}
+};
 
 void sighandler(int signum)
 {
@@ -17,30 +26,21 @@ void sighandler(int signum)
     tinydhcpd::last_signal = signum;
 }
 
-struct option_values {
-    struct in_addr address;
-    std::string interface;
-};
-
-const struct option long_options[] = {
-    { "address", required_argument, nullptr, ADDRESS_OPTION_TAG},
-    { "interface", required_argument, nullptr, IFACE_OPTION_TAG},
-    { nullptr, 0, nullptr, 0}
-};
-
 int main(int argc, char* const argv[])
 {
     std::signal(SIGINT, sighandler);
     std::signal(SIGTERM, sighandler);
     std::signal(SIGHUP, sighandler);
 
-    struct option_values optval = {
+    tinydhcpd::option_values optval = {
         .address = {.s_addr = INADDR_ANY},
-        .interface = ""
+        .interface = "",
+        .confpath = "/etc/tinydhcpd/tinydhcpd.conf",
+        .subnet_config = {}
     };
 
     char opt;
-    while ((opt = getopt_long(argc, argv, "a:i:", long_options, nullptr)) != -1)
+    while ((opt = getopt_long(argc, argv, "a:i:c:", long_options, nullptr)) != -1)
     {
         switch (opt)
         {
@@ -54,12 +54,27 @@ int main(int argc, char* const argv[])
             optval.interface = optarg;
             break;
 
+        case CONFIG_FILE_OPTION_TAG:
+            std::cout << "Config file: " << optarg << std::endl;
+            optval.confpath = optarg;
+            break;
+
         default:
             break;
         }
     }
 
-    tinydhcpd::Daemon daemon(optval.address, optval.interface);
+    try
+    {
+        tinydhcpd::parseConfiguration(optval);
+    }
+    catch (libconfig::ParseException& pex)
+    {
+        std::cerr << pex.getFile() << "|" << pex.getLine() << "|" << pex.getError() << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    tinydhcpd::Daemon daemon(optval.address, optval.interface, optval.subnet_config);
     std::cout << "finished" << std::endl;
     return 0;
 }

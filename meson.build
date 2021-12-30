@@ -5,5 +5,5 @@ project('tinydhcpd', 'cpp',
 #but during cross-compile I need to manually specify linking against gcc_s
 gcc_s_dependency = meson.get_compiler('cpp').find_library('gcc_s')
 libconfig_dependency = dependency('libconfig++')
-executable('tinydhcpd', 'src/main.cpp', 'src/daemon.cpp', 'src/socket.cpp', 'src/datagram.cpp',
+executable('tinydhcpd', 'src/main.cpp', 'src/daemon.cpp', 'src/socket.cpp', 'src/datagram.cpp', 'src/configuration.cpp',
     dependencies: [gcc_s_dependency, libconfig_dependency])

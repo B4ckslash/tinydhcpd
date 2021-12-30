@@ -47,7 +47,8 @@ namespace tinydhcpd
             throw std::runtime_error("Not a DHCP message!");
         }
 
-        std::vector<uint8_t> options(buffer + OPTIONS_OFFSET, buffer + buflen - OPTIONS_OFFSET);
+        //TODO parse options
+        std::vector<DhcpOption> options;
     }
 
     std::vector<uint8_t> DhcpDatagram::to_byte_vector()
