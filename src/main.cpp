@@ -39,7 +39,7 @@ int main(int argc, char* const argv[])
         .subnet_config = {}
     };
 
-    char opt;
+    int opt;
     while ((opt = getopt_long(argc, argv, "a:i:c:", long_options, nullptr)) != -1)
     {
         switch (opt)
