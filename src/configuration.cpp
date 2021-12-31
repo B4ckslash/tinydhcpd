@@ -10,7 +10,7 @@
 
 namespace tinydhcpd
 {
-    void parse_configuration(option_values& optval)
+    void parse_configuration(ProgramConfiguration& optval)
     {
         using ::libconfig::Setting, ::libconfig::Config;
         Config configuration;
@@ -57,7 +57,10 @@ namespace tinydhcpd
             parse_hosts(subnet_parsed_cfg, subnet_cfg);
         }
 
-        //TODO parse options
+        if (subnet_parsed_cfg.exists(OPTIONS_KEY))
+        {
+            parse_options(subnet_parsed_cfg, subnet_cfg);
+        }
 
         optval.subnet_config = subnet_cfg;
     }
@@ -78,16 +81,16 @@ namespace tinydhcpd
         }
     }
 
-    void parse_hosts(libconfig::Setting& subnet_block, SubnetConfiguration& subnet_cfg)
+    void parse_hosts(libconfig::Setting& subnet_cfg_block, SubnetConfiguration& subnet_cfg)
     {
         using ::libconfig::Setting, ::libconfig::SettingIterator;
 
-        Setting& hosts_config = subnet_block.lookup(HOSTS_KEY);
+        Setting& hosts_config = subnet_cfg_block.lookup(HOSTS_KEY);
         for (SettingIterator iter = hosts_config.begin(); iter != hosts_config.end(); iter++)
         {
             Setting& currentGroup = *iter;
             std::string config_ether_addr, config_fixed_address;
-            if (currentGroup.lookupValue(HOSTS_ETHER_HWADDR_KEY, config_ether_addr) && currentGroup.lookupValue(HOSTS_FIXED_ADDRESS_KEY, config_fixed_address))
+            if (currentGroup.lookupValue(HOSTS_TYPE_ETHER_KEY, config_ether_addr) && currentGroup.lookupValue(HOSTS_FIXED_ADDRESS_KEY, config_fixed_address))
             {
                 ether_addr* parsed_ether_addr = ether_aton(config_ether_addr.c_str());
                 in_addr parsed_ip4_addr = {};
@@ -103,7 +106,7 @@ namespace tinydhcpd
                     std::cerr << "Invalid fixed address in hosts list: " << config_fixed_address << std::endl;
                     continue;
                 }
-                if((parsed_ip4_addr.s_addr & subnet_cfg.netmask.s_addr) != netmasked_subnet_address)
+                if ((parsed_ip4_addr.s_addr & subnet_cfg.netmask.s_addr) != netmasked_subnet_address)
                 {
                     std::cerr << "Address is not in subnet: " << config_fixed_address << std::endl;
                     continue;
@@ -113,5 +116,65 @@ namespace tinydhcpd
                 subnet_cfg.fixed_hosts.push_back({ *parsed_ether_addr, parsed_ip4_addr });
             }
         }
+    }
+
+    void parse_options(libconfig::Setting& subnet_cfg_block, SubnetConfiguration& subnet_cfg)
+    {
+        using ::libconfig::Setting, ::libconfig::SettingIterator;
+        Setting& options_config = subnet_cfg_block.lookup(OPTIONS_KEY);
+        for (SettingIterator options_iter = options_config.begin(); options_iter != options_config.end(); options_iter++)
+        {
+            Setting& current_setting = *options_iter;
+            std::string option_key(current_setting.getName());
+            libconfig::Setting::Type valueType = current_setting.getType();
+
+            try {
+                OptionTag tag = key_tag_mapping.at(option_key);
+                std::cout << "Option tag: " << static_cast<uint16_t>(tag) << " ";
+                switch (valueType)
+                {
+                    case libconfig::Setting::Type::TypeInt:
+                    {
+                        int config_value = current_setting;
+                        auto netarray = to_network_byte_array((uint16_t)config_value);
+                        std::vector<uint8_t> value(netarray.begin(), netarray.end());
+                        subnet_cfg.defined_options.emplace_back(tag, netarray.size(), value);
+                        break;
+                    }
+
+                    case libconfig::Setting::Type::TypeArray:
+                    {
+                        std::vector<uint8_t> addresses;
+                        for (SettingIterator array_iter = current_setting.begin(); array_iter != current_setting.end(); array_iter++)
+                        {
+                            const std::array<uint8_t, 4>& address_bytes = parse_ip_address(*array_iter);
+                            addresses.insert(addresses.end(), address_bytes.begin(), address_bytes.end());
+                        }
+                        subnet_cfg.defined_options.emplace_back(tag, addresses.size(), addresses);
+                        break;
+                    }
+
+                    default: 
+                        const std::array<uint8_t, 4>& address_bytes = parse_ip_address(current_setting);
+                        std::vector<uint8_t> address(address_bytes.begin(), address_bytes.end());
+                        subnet_cfg.defined_options.emplace_back(tag, address.size(), address);
+                        break;
+                }
+            }
+            catch (std::out_of_range& oor)
+            {
+                std::cerr << "Unknown option: " << option_key << std::endl;
+                continue;
+            }
+        }
+    }
+
+    std::array<uint8_t, 4> parse_ip_address(const char* address_string)
+    {
+        std::cout << "Reading address: " << (std::string) address_string << std::endl;
+        struct in_addr address = {};
+        inet_aton(address_string, &address);
+        std::array<uint8_t, 4> address_bytes = to_byte_array<in_addr_t, 4>(address.s_addr);
+        return address_bytes;
     }
 } // namespace tinydhcpd

@@ -17,6 +17,7 @@ To compile and run `tinydhcpd`, you need the following:
 - [libconfig](https://github.com/hyperrealm/libconfig)
   - Ubuntu: `apt install libconfig`
   - Gentoo: `emerge libconfig`  
+- [Meson](https://mesonbuild.com/)
 - A compiler supporting C++20 designated initializers (GCC 8 or later, Clang 10 or later)
 
 To compile, execute the following in the root of the repository:
@@ -40,11 +41,11 @@ Currently, the following commandline options are available:
 
 Most DHCP servers these days come bundled with a DNS server of some sort (e.g. `dnsmasq` and the ISC's DHCP server implementation) to allow for tight integration between DNS and IP allocation. That unfortunately also means that they are big pieces of software, which can become a problem on small embedded systems, and their complex dependencies can lead to build failures or crashes when built against a non-standard configuration (e.g. for aarch64 with musl-libc).
 
-The inability to properly cross-compile and/or use the above programs strictly for DHCP motivated me to write my own little DHCP server, which only does DHCP and nothing else
+The inability to properly cross-compile and/or use the above programs strictly for DHCP motivated me to write my own little DHCP server, which only does DHCP and nothing else.
 
 ### Goals
 
 - Implement a standards-conform DHCP server
 - Allow for easy cross-compilation
 - Explicitly support smaller/alternative libc implementations (like musl-libc)
-- Ideally minimize executable size (as of Dec 2021, the size-optimized binary clocks in at just 48K)
+- Ideally minimize executable size (as of Dec 2021, the size-optimized stripped binary clocks in at just 36K)

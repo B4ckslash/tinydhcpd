@@ -32,7 +32,7 @@ int main(int argc, char* const argv[])
     std::signal(SIGTERM, sighandler);
     std::signal(SIGHUP, sighandler);
 
-    tinydhcpd::option_values optval = {
+    tinydhcpd::ProgramConfiguration optval = {
         .address = {.s_addr = INADDR_ANY},
         .interface = "",
         .confpath = "/etc/tinydhcpd/tinydhcpd.conf",

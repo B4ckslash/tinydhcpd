@@ -24,5 +24,8 @@ namespace tinydhcpd
         std::cout << string_format("XID: %#010x", datagram.transaction_id) << std::endl;
         std::cout << "Subnet: " << inet_ntoa(netconfig.subnet_address) << std::endl;
         std::cout << "Range: " << inet_ntoa(netconfig.range_start) << " - " << inet_ntoa(netconfig.range_end) << std::endl;
+        std::for_each(netconfig.defined_options.begin(), netconfig.defined_options.end(), [](const DhcpOption& opt) {
+            std::cout << "Option: " << static_cast<uint16_t>(opt.tag) << " | Length: " << opt.length << std::endl;
+            });
     }
 } // namespace tinydhcpd

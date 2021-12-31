@@ -16,4 +16,19 @@ namespace tinydhcpd
         std::snprintf(buf.get(), size, format.c_str(), args ...);
         return std::string(buf.get(), buf.get() + size - 1); // We don't want the '\0' inside
     }
+
+    template<typename N, size_t size>
+    std::array<uint8_t, size> to_byte_array(N number)
+    {
+        std::array<uint8_t, size> arr;
+        for (size_t i = 0; i < size; i++)
+        {
+            uint8_t shift = 8 * i;
+            arr[i] = (number & (((N)0xff) << shift)) >> shift;
+        }
+        return arr;
+    }
+
+    std::array<uint8_t, 4> to_network_byte_array(uint32_t number);
+    std::array<uint8_t, 2> to_network_byte_array(uint16_t number);
 } // namespace tinydhcpd
