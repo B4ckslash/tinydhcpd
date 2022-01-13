@@ -14,8 +14,8 @@ most common DHCP options.
 To compile and run `tinydhcpd`, you need the following:
 
 - Linux with `epoll` support
-- [libconfig](https://github.com/hyperrealm/libconfig)
-  - Ubuntu: `apt install libconfig`
+- [libconfig++](https://github.com/hyperrealm/libconfig)
+  - Ubuntu: `apt install libconfig++-dev`
   - Gentoo: `emerge libconfig`  
 - [Meson](https://mesonbuild.com/)
 - A compiler supporting C++20 designated initializers (GCC 8 or later, Clang 10 or later)
@@ -33,7 +33,7 @@ By default, `tinydhcpd` looks for a file called `tinydhcpd.conf` in `/etc/tinydh
 
 Currently, the following commandline options are available:
 ```
--a, --address w.x.y.z        Listen on address w.x.y.z
+-a, --address <address>      Listen on address <address>
 -i, --interface <iface>      Bind to interface <iface>
 -c, --configfile <file>      Use <file> instead of the default config file
 ```
