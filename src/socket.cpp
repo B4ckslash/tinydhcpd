@@ -24,7 +24,7 @@ namespace tinydhcpd
         setup_epoll();
     }
 
-    Socket::~Socket()
+    Socket::~Socket() noexcept
     {
         close(epoll_fd);
         close(socket_fd);
@@ -47,7 +47,7 @@ namespace tinydhcpd
     void Socket::bind_to_iface(const std::string iface_name)
     {
         struct ifreq ireq = {};
-        snprintf(ireq.ifr_name, sizeof(ireq.ifr_name), iface_name.c_str());
+        snprintf(ireq.ifr_name, sizeof(ireq.ifr_name), "%s", iface_name.c_str());
         if (setsockopt(socket_fd, SOL_SOCKET, SO_BINDTODEVICE, (const void*)&ireq, sizeof(ireq)) < 0)
         {
             std::string msg("Failed to bind to interface ");
