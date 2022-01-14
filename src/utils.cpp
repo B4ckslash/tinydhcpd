@@ -17,7 +17,7 @@ namespace tinydhcpd
             network_byte_order_number = htons(number);
         }
 
-        return to_byte_array<N, size>(network_byte_order_number);
+        return to_byte_array<>(network_byte_order_number);
     }
 
 

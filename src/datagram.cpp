@@ -1,28 +1,39 @@
 #include "datagram.hpp"
+#include "utils.hpp"
 
 #include <arpa/inet.h>
 
-#define OPCODE_OFFSET 0
-#define HWADDR_TYPE_OFFSET 1
-#define HWADDR_LENGTH_OFFSET 2
-#define NR_HOPS_OFFSET 3
-#define TRANSACTION_ID_OFFSET 4
-#define SECS_PASSED_OFFSET 8
-#define FLAGS_OFFSET 10
-#define CLIENT_IP_OFFSET 12
-#define ASSIGNED_IP_OFFSET 16
-#define SERVER_IP_OFFSET 20
-#define RELAY_AGENT_IP_OFFSET 24
-#define CLIENT_HWADDR_OFFSET 28
-#define SERVER_HOSTNAME_OFFSET 44
-#define BOOT_FILE_NAME_OFFSET 108
-#define MAGIC_COOKIE_OFFSET 236
-#define OPTIONS_OFFSET 240
+#include <map>
+#include <stdexcept>
 
-#define DHCP_MAGIC_COOKIE 0x63825363
 
 namespace tinydhcpd
 {
+    const int OPCODE_OFFSET = 0;
+    const int HWADDR_TYPE_OFFSET = 1;
+    const int HWADDR_LENGTH_OFFSET = 2;
+    const int NR_HOPS_OFFSET = 3;
+    const int TRANSACTION_ID_OFFSET = 4;
+    const int SECS_PASSED_OFFSET = 8;
+    const int FLAGS_OFFSET = 10;
+    const int CLIENT_IP_OFFSET = 12;
+    const int ASSIGNED_IP_OFFSET = 16;
+    const int SERVER_IP_OFFSET = 20;
+    const int RELAY_AGENT_IP_OFFSET = 24;
+    const int CLIENT_HWADDR_OFFSET = 28;
+    const int SERVER_HOSTNAME_OFFSET = 44;
+    const int BOOT_FILE_NAME_OFFSET = 108;
+    const int MAGIC_COOKIE_OFFSET = 236;
+    const int OPTIONS_OFFSET = 240;
+
+    const int DHCP_MAGIC_COOKIE = 0x63825363;
+
+    const std::map<OptionTag, uint8_t> predefined_option_lengths = {
+        {OptionTag::PAD, 0}, {OptionTag::DHCP_MESSAGE_TYPE, 1}, {OptionTag::SUBNET_MASK, 4},
+        {OptionTag::TIME_OFFSET, 4}, {OptionTag::REQUESTED_IP_ADDRESS, 4},
+        {OptionTag::OPTIONS_END, 0},
+    };
+
     DhcpDatagram::DhcpDatagram(uint8_t* buffer, int buflen)
     {
         using namespace tinydhcpd;
@@ -47,8 +58,35 @@ namespace tinydhcpd
             throw std::runtime_error("Not a DHCP message!");
         }
 
-        //TODO parse options
-        std::vector<DhcpOption> options;
+        options = parse_options(buffer + OPTIONS_OFFSET, buflen - OPTIONS_OFFSET);
+    }
+
+    std::vector<DhcpOption> DhcpDatagram::parse_options(const uint8_t* options_buffer, size_t buffer_size)
+    {
+        std::vector<DhcpOption> parsed_options;
+        while (options_buffer < (options_buffer + buffer_size))
+        {
+            OptionTag tag = static_cast<OptionTag>(*options_buffer++);
+            if (predefined_option_lengths.contains(tag) && predefined_option_lengths.at(tag) == 0)
+            {
+                if (tag == OptionTag::OPTIONS_END)
+                {
+                    break;
+                }
+                continue;
+            }
+
+            uint8_t option_length = *options_buffer++;
+            if (predefined_option_lengths.contains(tag) && predefined_option_lengths.at(tag) != option_length)
+            {
+                throw std::invalid_argument(string_format("Invalid option length! Tag: %u | Legal length: %u | Actual length: %u",
+                    static_cast<uint8_t>(tag), predefined_option_lengths.at(tag), option_length));
+            }
+            std::vector<uint8_t> value(options_buffer, options_buffer + option_length);
+            parsed_options.emplace_back(tag, option_length, value);
+            options_buffer += option_length;
+        }
+        return parsed_options;
     }
 
     std::vector<uint8_t> DhcpDatagram::to_byte_vector()

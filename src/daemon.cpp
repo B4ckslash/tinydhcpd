@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>
 
+#include "src/datagram.hpp"
 #include "utils.hpp"
 
 namespace tinydhcpd
@@ -22,10 +23,14 @@ namespace tinydhcpd
     void Daemon::handle_recv(DhcpDatagram& datagram)
     {
         std::cout << string_format("XID: %#010x", datagram.transaction_id) << std::endl;
-        std::cout << "Subnet: " << inet_ntoa(netconfig.subnet_address) << std::endl;
-        std::cout << "Range: " << inet_ntoa(netconfig.range_start) << " - " << inet_ntoa(netconfig.range_end) << std::endl;
-        std::for_each(netconfig.defined_options.begin(), netconfig.defined_options.end(), [](const DhcpOption& opt) {
-            std::cout << "Option: " << static_cast<uint16_t>(opt.tag) << " | Length: " << opt.length << std::endl;
-            });
+        std::for_each(datagram.options.begin(), datagram.options.end(), [] (const DhcpOption& option)
+        {
+            std::cout << string_format("Tag %u | Length %u | Value(s) ", static_cast<uint8_t>(option.tag), option.length);
+            for(uint8_t val_byte : option.value)
+            {
+                std::cout << string_format("%#04x ", val_byte);
+            }
+            std::cout << std::endl;
+        });
     }
 } // namespace tinydhcpd

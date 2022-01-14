@@ -110,8 +110,15 @@ namespace tinydhcpd
                     {
                         continue;
                     }
-                    DhcpDatagram datagram(raw_data_buffer, DGRAM_SIZE);
-                    observer.handle_recv(datagram);
+                    try
+                    {
+                        DhcpDatagram datagram(raw_data_buffer, DGRAM_SIZE);
+                        observer.handle_recv(datagram);
+                    }
+                    catch (std::invalid_argument& ex)
+                    {
+                        std::cerr << ex.what() << std::endl;
+                    }
                     std::fill(raw_data_buffer, raw_data_buffer + DGRAM_SIZE, (uint8_t)0);
                 }
                 else if ((events[n].events & EPOLLOUT) > 0 && !send_queue.empty())

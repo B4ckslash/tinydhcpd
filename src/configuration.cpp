@@ -112,7 +112,6 @@ namespace tinydhcpd
                     continue;
                 }
 
-                std::cout << "Read pair of " << config_ether_addr << " & " << config_fixed_address << std::endl;
                 subnet_cfg.fixed_hosts.push_back({ *parsed_ether_addr, parsed_ip4_addr });
             }
         }
@@ -130,7 +129,6 @@ namespace tinydhcpd
 
             try {
                 OptionTag tag = key_tag_mapping.at(option_key);
-                std::cout << "Option tag: " << static_cast<uint16_t>(tag) << " ";
                 switch (valueType)
                 {
                     case libconfig::Setting::Type::TypeInt:
@@ -171,10 +169,8 @@ namespace tinydhcpd
 
     std::array<uint8_t, 4> parse_ip_address(const char* address_string)
     {
-        std::cout << "Reading address: " << (std::string) address_string << std::endl;
-        struct in_addr address = {};
-        inet_aton(address_string, &address);
-        std::array<uint8_t, 4> address_bytes = to_byte_array<in_addr_t, 4>(address.s_addr);
+        in_addr_t address = inet_network(address_string);
+        std::array<uint8_t, 4> address_bytes = to_byte_array<>(address);
         return address_bytes;
     }
 } // namespace tinydhcpd

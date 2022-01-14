@@ -7,6 +7,7 @@ namespace tinydhcpd
 {
     enum struct OptionTag : uint8_t
     {
+        PAD = 0,
         SUBNET_MASK = 1,
         TIME_OFFSET = 2,
         ROUTERS = 3,
@@ -17,7 +18,10 @@ namespace tinydhcpd
         DOMAIN_NAME = 15,
         IFACE_MTU = 26,
         BROADCAST_ADDR = 28,
-        STATIC_ROUTES = 33
+        STATIC_ROUTES = 33,
+        REQUESTED_IP_ADDRESS = 50,
+        DHCP_MESSAGE_TYPE = 53,
+        OPTIONS_END = 255 
     };
 
     struct DhcpOption
@@ -49,6 +53,7 @@ namespace tinydhcpd
         DhcpDatagram(uint8_t* buffer, int buflen);
 
         std::vector<uint8_t> to_byte_vector();
+        std::vector<DhcpOption> parse_options(const uint8_t* options_buffer, size_t buffer_size);
     };
 
     uint16_t convert_network_byte_array_to_uint16(uint8_t* array);
