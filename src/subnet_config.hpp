@@ -1,23 +1,21 @@
 #pragma once
 
-#include <netinet/in.h>
-#include <net/ethernet.h>
 #include <linux/if_packet.h>
+#include <net/ethernet.h>
+#include <netinet/in.h>
 
 #include <vector>
 
 #include "datagram.hpp"
 
-namespace tinydhcpd
-{
-    struct SubnetConfiguration
-    {
-        struct in_addr subnet_address;
-        struct in_addr range_start;
-        struct in_addr range_end; 
-        struct in_addr netmask;
+namespace tinydhcpd {
+struct SubnetConfiguration {
+  struct in_addr subnet_address;
+  struct in_addr range_start;
+  struct in_addr range_end;
+  struct in_addr netmask;
 
-        std::vector<std::pair<struct ether_addr, struct in_addr>> fixed_hosts;
-        std::vector<DhcpOption> defined_options;
-    };
+  std::vector<std::pair<struct ether_addr, struct in_addr>> fixed_hosts;
+  std::vector<DhcpOption> defined_options;
+};
 } // namespace tinydhcpd
