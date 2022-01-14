@@ -2,3 +2,6 @@ build/*
 main
 .vscode/
 builddir/
+.vim/
+.cache/
+compile_commands.json
