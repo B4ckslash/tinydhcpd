@@ -133,7 +133,7 @@ void parse_options(libconfig::Setting &subnet_cfg_block,
         int config_value = current_setting;
         auto netarray = to_network_byte_array((uint16_t)config_value);
         std::vector<uint8_t> value(netarray.begin(), netarray.end());
-        subnet_cfg.defined_options.emplace_back(tag, netarray.size(), value);
+        subnet_cfg.defined_options[tag] = value;
         break;
       }
 
@@ -146,8 +146,7 @@ void parse_options(libconfig::Setting &subnet_cfg_block,
           addresses.insert(addresses.end(), address_bytes.begin(),
                            address_bytes.end());
         }
-        subnet_cfg.defined_options.emplace_back(tag, addresses.size(),
-                                                addresses);
+        subnet_cfg.defined_options[tag] = addresses;
         break;
       }
 
@@ -156,7 +155,7 @@ void parse_options(libconfig::Setting &subnet_cfg_block,
             parse_ip_address(current_setting);
         std::vector<uint8_t> address(address_bytes.begin(),
                                      address_bytes.end());
-        subnet_cfg.defined_options.emplace_back(tag, address.size(), address);
+        subnet_cfg.defined_options[tag] = address;
         break;
       }
     } catch (std::out_of_range &oor) {

@@ -3,6 +3,7 @@
 
 #include <arpa/inet.h>
 
+#include <cstdint>
 #include <map>
 #include <stdexcept>
 
@@ -64,9 +65,9 @@ DhcpDatagram::DhcpDatagram(uint8_t *buffer, int buflen) {
   options = parse_options(buffer + OPTIONS_OFFSET, buflen - OPTIONS_OFFSET);
 }
 
-std::vector<DhcpOption>
+std::map<OptionTag, std::vector<uint8_t>>
 DhcpDatagram::parse_options(const uint8_t *options_buffer, size_t buffer_size) {
-  std::vector<DhcpOption> parsed_options;
+  std::map<OptionTag, std::vector<uint8_t>> parsed_options;
   while (options_buffer < (options_buffer + buffer_size)) {
     OptionTag tag = static_cast<OptionTag>(*options_buffer++);
     if (predefined_option_lengths.contains(tag) &&
@@ -87,7 +88,7 @@ DhcpDatagram::parse_options(const uint8_t *options_buffer, size_t buffer_size) {
                         predefined_option_lengths.at(tag), option_length));
     }
     std::vector<uint8_t> value(options_buffer, options_buffer + option_length);
-    parsed_options.emplace_back(tag, option_length, value);
+    parsed_options[tag] = value;
     options_buffer += option_length;
   }
   return parsed_options;

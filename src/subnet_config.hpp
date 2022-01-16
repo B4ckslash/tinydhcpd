@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <linux/if_packet.h>
 #include <net/ethernet.h>
 #include <netinet/in.h>
@@ -16,6 +17,6 @@ struct SubnetConfiguration {
   struct in_addr netmask;
 
   std::vector<std::pair<struct ether_addr, struct in_addr>> fixed_hosts;
-  std::vector<DhcpOption> defined_options;
+  std::map<OptionTag, std::vector<uint8_t>> defined_options;
 };
 } // namespace tinydhcpd

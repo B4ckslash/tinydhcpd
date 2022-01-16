@@ -21,11 +21,11 @@ void Daemon::handle_recv(DhcpDatagram &datagram) {
   std::cout << string_format("XID: %#010x", datagram.transaction_id)
             << std::endl;
   std::for_each(datagram.options.begin(), datagram.options.end(),
-                [](const DhcpOption &option) {
+                [](const auto &option) {
                   std::cout << string_format("Tag %u | Length %u | Value(s) ",
-                                             static_cast<uint8_t>(option.tag),
-                                             option.length);
-                  for (uint8_t val_byte : option.value) {
+                                             static_cast<uint8_t>(option.first),
+                                             option.second.size());
+                  for (uint8_t val_byte : option.second) {
                     std::cout << string_format("%#04x ", val_byte);
                   }
                   std::cout << std::endl;
