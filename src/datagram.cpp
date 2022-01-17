@@ -36,33 +36,36 @@ const std::map<OptionTag, uint8_t> predefined_option_lengths = {
     {OptionTag::OPTIONS_END, 0},
 };
 
-DhcpDatagram::DhcpDatagram(uint8_t *buffer, int buflen) {
-  using namespace tinydhcpd;
+DhcpDatagram DhcpDatagram::from_buffer(uint8_t *buffer, int buflen) {
+  DhcpDatagram datagram;
+  datagram.opcode = buffer[OPCODE_OFFSET];
+  datagram.hwaddr_type = buffer[HWADDR_TYPE_OFFSET];
+  datagram.hwaddr_len = buffer[HWADDR_LENGTH_OFFSET];
 
-  opcode = buffer[OPCODE_OFFSET];
-  hwaddr_type = buffer[HWADDR_TYPE_OFFSET];
-  hwaddr_len = buffer[HWADDR_LENGTH_OFFSET];
-
-  transaction_id =
+  datagram.transaction_id =
       convert_network_byte_array_to_uint32(buffer + TRANSACTION_ID_OFFSET);
-  secs_passed =
+  datagram.secs_passed =
       convert_network_byte_array_to_uint16(buffer + SECS_PASSED_OFFSET);
-  flags = convert_network_byte_array_to_uint16(buffer + FLAGS_OFFSET);
+  datagram.flags = convert_network_byte_array_to_uint16(buffer + FLAGS_OFFSET);
 
-  client_ip = convert_network_byte_array_to_uint32(buffer + CLIENT_IP_OFFSET);
-  assigned_ip =
+  datagram.client_ip =
+      convert_network_byte_array_to_uint32(buffer + CLIENT_IP_OFFSET);
+  datagram.assigned_ip =
       convert_network_byte_array_to_uint32(buffer + ASSIGNED_IP_OFFSET);
-  server_ip = convert_network_byte_array_to_uint32(buffer + SERVER_IP_OFFSET);
+  datagram.server_ip =
+      convert_network_byte_array_to_uint32(buffer + SERVER_IP_OFFSET);
 
   std::copy(buffer + CLIENT_HWADDR_OFFSET, buffer + SERVER_HOSTNAME_OFFSET - 1,
-            hw_addr);
+            datagram.hw_addr);
   uint32_t cookie = ntohl(*(uint32_t *)(buffer + MAGIC_COOKIE_OFFSET));
   if (cookie != DHCP_MAGIC_COOKIE) {
     std::cout << cookie << " expected " << DHCP_MAGIC_COOKIE << std::endl;
     throw std::runtime_error("Not a DHCP message!");
   }
 
-  options = parse_options(buffer + OPTIONS_OFFSET, buflen - OPTIONS_OFFSET);
+  datagram.options =
+      parse_options(buffer + OPTIONS_OFFSET, buflen - OPTIONS_OFFSET);
+  return datagram;
 }
 
 std::map<OptionTag, std::vector<uint8_t>>

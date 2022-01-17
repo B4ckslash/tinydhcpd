@@ -1,13 +1,23 @@
 #include "socket.hpp"
 
+#include <algorithm>
 #include <arpa/inet.h>
+#include <bits/types/struct_iovec.h>
+#include <byteswap.h>
+#include <cstdint>
+#include <iterator>
 #include <net/if.h>
+#include <netinet/in.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #include "daemon.hpp"
+#include "src/utils.hpp"
 
 #define DGRAM_SIZE 576
+
+//TODO refactor epoll into separate RAII class
 
 namespace tinydhcpd {
 Socket::Socket(const struct in_addr &address, const std::string &iface_name,
@@ -39,11 +49,16 @@ void Socket::create_socket() {
   if (socket_fd == -1) {
     die("Failed to create socket: ");
   }
+  int enable = 1;
+  if (setsockopt(socket_fd, IPPROTO_IP, IP_PKTINFO, &enable, sizeof(enable)) <
+      0) {
+    die("Failed to set socket option IP_PKTINFO: ");
+  }
 }
 
 void Socket::bind_to_iface(const std::string iface_name) {
   struct ifreq ireq = {};
-  snprintf(ireq.ifr_name, sizeof(ireq.ifr_name), "%s", iface_name.c_str());
+  std::snprintf(ireq.ifr_name, sizeof(ireq.ifr_name), "%s", iface_name.c_str());
   if (setsockopt(socket_fd, SOL_SOCKET, SO_BINDTODEVICE, (const void *)&ireq,
                  sizeof(ireq)) < 0) {
     std::string msg("Failed to bind to interface ");
@@ -74,6 +89,14 @@ void Socket::setup_epoll() {
 void Socket::recv_loop() {
   int number_ready_fds;
   uint8_t raw_data_buffer[DGRAM_SIZE];
+  uint8_t control_msg_buffer[256];
+  struct iovec data_buffer {
+    .iov_base = raw_data_buffer, .iov_len = DGRAM_SIZE
+  };
+  struct msghdr message_header {
+    .msg_name = nullptr, .msg_iov = &data_buffer, .msg_iovlen = 1,
+    .msg_control = &control_msg_buffer, .msg_controllen = 256
+  };
   std::fill(raw_data_buffer, raw_data_buffer + DGRAM_SIZE, (uint8_t)0);
   while (true) {
     if (tinydhcpd::last_signal == SIGINT || tinydhcpd::last_signal == SIGTERM) {
@@ -90,11 +113,15 @@ void Socket::recv_loop() {
     }
     for (int n = 0; n < number_ready_fds; n++) {
       if ((events[n].events & EPOLLIN) > 0) {
-        if (recv(socket_fd, raw_data_buffer, DGRAM_SIZE, MSG_WAITALL) < 0) {
+        if (recvmsg(socket_fd, &message_header, MSG_WAITALL) < 0) {
           continue;
         }
         try {
-          DhcpDatagram datagram(raw_data_buffer, DGRAM_SIZE);
+          DhcpDatagram datagram =
+              DhcpDatagram::from_buffer(raw_data_buffer, DGRAM_SIZE);
+          if (datagram.server_ip == static_cast<uint32_t>(0x0)) {
+            datagram.server_ip = extract_destination_ip(message_header);
+          }
           observer.handle_recv(datagram);
         } catch (std::invalid_argument &ex) {
           std::cerr << ex.what() << std::endl;
@@ -112,6 +139,21 @@ void Socket::recv_loop() {
       }
     }
   }
+}
+
+uint32_t Socket::extract_destination_ip(struct msghdr &message_header) {
+  for (struct cmsghdr *control_message = CMSG_FIRSTHDR(&message_header);
+       control_message != nullptr;
+       control_message = CMSG_NXTHDR(&message_header, control_message)) {
+    if (control_message->cmsg_level != IPPROTO_IP ||
+        control_message->cmsg_type != IP_PKTINFO) {
+      continue;
+    }
+    struct in_pktinfo *packet_info =
+        reinterpret_cast<struct in_pktinfo *>(CMSG_DATA(control_message));
+    return bswap_32(packet_info->ipi_addr.s_addr);
+  }
+  return 0;
 }
 
 void Socket::enqueue_datagram(struct sockaddr &destination,

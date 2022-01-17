@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <iostream>
 #include <map>
+#include <netinet/in.h>
 #include <vector>
 
 namespace tinydhcpd {
@@ -42,10 +43,10 @@ struct DhcpDatagram {
 
   std::map<OptionTag, std::vector<uint8_t>> options;
 
-  DhcpDatagram(uint8_t *buffer, int buflen);
+  static DhcpDatagram from_buffer(uint8_t *buffer, int buflen);
 
   std::vector<uint8_t> to_byte_vector();
-  std::map<OptionTag, std::vector<uint8_t>>
+  static std::map<OptionTag, std::vector<uint8_t>>
   parse_options(const uint8_t *options_buffer, size_t buffer_size);
 };
 

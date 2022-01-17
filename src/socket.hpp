@@ -1,10 +1,12 @@
 #pragma once
 
+#include <cstdint>
 #include <netinet/in.h>
 #include <sys/epoll.h>
 
 #include <iostream>
 #include <queue>
+#include <sys/socket.h>
 #include <utility>
 
 #include "datagram.hpp"
@@ -26,6 +28,7 @@ private:
   void bind_to_iface(std::string iface_name);
   void bind_to_address(const struct sockaddr_in &address);
   void setup_epoll();
+  uint32_t extract_destination_ip(struct msghdr& message_header);
 
 public:
   Socket(const struct in_addr &address, const std::string &iface_name,
