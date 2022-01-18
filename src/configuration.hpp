@@ -4,6 +4,7 @@
 #include <iostream>
 #include <map>
 
+#include "datagram.hpp"
 #include "subnet_config.hpp"
 
 namespace tinydhcpd {

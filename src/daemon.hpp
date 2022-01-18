@@ -1,21 +1,17 @@
 #pragma once
 
-#include "socket.hpp"
-
 #include <netinet/in.h>
 
-#include <csignal>
-#include <iostream>
-
+#include "epoll.hpp"
+#include "socket.hpp"
 #include "socket_observer.hpp"
-#include "src/datagram.hpp"
 #include "subnet_config.hpp"
 
 namespace tinydhcpd {
-extern volatile std::sig_atomic_t last_signal;
 class Daemon : SocketObserver {
 private:
   Socket socket;
+  Epoll<Socket> epoll_socket;
   SubnetConfiguration netconfig;
   DhcpDatagram
   create_skeleton_reply_datagram(const DhcpDatagram &request_datagram);

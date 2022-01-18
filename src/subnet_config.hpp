@@ -1,15 +1,13 @@
 #pragma once
 
-#include <cstdint>
-#include <linux/if_packet.h>
-#include <net/ethernet.h>
 #include <netinet/in.h>
-
+#include <netinet/if_ether.h>
 #include <vector>
-
-#include "datagram.hpp"
+#include <map>
 
 namespace tinydhcpd {
+enum struct OptionTag : uint8_t;
+
 struct SubnetConfiguration {
   struct in_addr subnet_address;
   struct in_addr range_start;

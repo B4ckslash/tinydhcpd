@@ -1,10 +1,5 @@
 #include "daemon.hpp"
 
-#include <algorithm>
-#include <arpa/inet.h>
-#include <cstdint>
-
-#include "src/datagram.hpp"
 #include "utils.hpp"
 
 namespace tinydhcpd {
@@ -17,8 +12,10 @@ constexpr uint8_t DHCP_TYPE_INFORM = 8;
 
 Daemon::Daemon(const struct in_addr &address, const std::string &iface_name,
                SubnetConfiguration &netconfig) try
-    : socket{address, iface_name, *this}, netconfig(netconfig) {
-  socket.recv_loop();
+    : socket(address, iface_name, *this),
+      epoll_socket(socket, (EPOLLIN | EPOLLOUT)), 
+      netconfig(netconfig) {
+  epoll_socket.poll_loop();
 } catch (std::runtime_error &ex) {
   printf("%s\n", ex.what());
   exit(EXIT_FAILURE);
@@ -57,7 +54,7 @@ void Daemon::handle_recv(DhcpDatagram &datagram) {
 void Daemon::handle_discovery(const DhcpDatagram &datagram) {
   DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
   std::cout << "DHCPDISCOVER" << std::endl;
-  }
+}
 
 DhcpDatagram
 Daemon::create_skeleton_reply_datagram(const DhcpDatagram &request_datagram) {

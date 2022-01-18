@@ -89,7 +89,7 @@ void parse_hosts(libconfig::Setting &subnet_cfg_block,
     if (currentGroup.lookupValue(HOSTS_TYPE_ETHER_KEY, config_ether_addr) &&
         currentGroup.lookupValue(HOSTS_FIXED_ADDRESS_KEY,
                                  config_fixed_address)) {
-      ether_addr *parsed_ether_addr = ether_aton(config_ether_addr.c_str());
+      struct ether_addr *parsed_ether_addr = ether_aton(config_ether_addr.c_str());
       in_addr parsed_ip4_addr = {};
       in_addr_t netmasked_subnet_address =
           subnet_cfg.subnet_address.s_addr & subnet_cfg.netmask.s_addr;

@@ -3,8 +3,8 @@
 #include "datagram.hpp"
 
 namespace tinydhcpd {
+
 class SocketObserver {
-private:
 public:
   virtual ~SocketObserver(){};
 
