@@ -68,7 +68,7 @@ int main(int argc, char *const argv[]) {
   }
 
   tinydhcpd::Daemon daemon(optval.address, optval.interface,
-                           optval.subnet_config);
+                           optval.subnet_config, optval.lease_file_path);
   std::cout << "finished" << std::endl;
   return 0;
 }

@@ -21,6 +21,12 @@ void parse_configuration(ProgramConfiguration &optval) {
     throw std::invalid_argument(
         "One of (listen-address|interface) must be given!");
   }
+
+  if(!configuration.lookupValue(LEASE_FILE_KEY, optval.lease_file_path))
+  {
+    optval.lease_file_path = "/var/lib/tinydhcpd/leases";
+  }
+
   if (!config_listen_address.empty()) {
     inet_aton(config_listen_address.c_str(), &(optval.address));
   }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+#include <fstream>
 #include <netinet/in.h>
 
 #include "epoll.hpp"
@@ -15,11 +17,17 @@ private:
   SubnetConfiguration netconfig;
   DhcpDatagram
   create_skeleton_reply_datagram(const DhcpDatagram &request_datagram);
+  std::fstream lease_file;
+  std::map<in_addr_t, std::pair<std::array<uint8_t,16>,uint64_t>> active_leases;
+  void load_leases();
   void handle_discovery(const DhcpDatagram &datagram);
+  void handle_request(const DhcpDatagram &datagram);
+  void handle_release(const DhcpDatagram &datagram);
+  void handle_inform(const DhcpDatagram &datagram);
 
 public:
   Daemon(const struct in_addr &address, const std::string &iface_name,
-         SubnetConfiguration &netconfig);
+         SubnetConfiguration &netconfig, const std::string &lease_file_path);
   virtual ~Daemon() {}
   virtual void handle_recv(DhcpDatagram &datagram) override;
 };

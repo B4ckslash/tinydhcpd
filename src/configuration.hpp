@@ -16,6 +16,7 @@ const std::string RANGE_START_KEY = "range-start";
 const std::string RANGE_END_KEY = "range-end";
 const std::string OPTIONS_KEY = "options";
 const std::string HOSTS_KEY = "hosts";
+const std::string LEASE_FILE_KEY = "lease-file";
 
 const std::string HOSTS_TYPE_ETHER_KEY = "ether";
 const std::string HOSTS_FIXED_ADDRESS_KEY = "fixed-address";
@@ -31,6 +32,7 @@ struct ProgramConfiguration {
   struct in_addr address;
   std::string interface;
   std::string confpath;
+  std::string lease_file_path;
   tinydhcpd::SubnetConfiguration subnet_config;
 };
 
