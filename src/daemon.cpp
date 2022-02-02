@@ -1,6 +1,6 @@
 #include "daemon.hpp"
 
-#include "src/datagram.hpp"
+#include "datagram.hpp"
 #include "utils.hpp"
 #include <arpa/inet.h>
 #include <chrono>
