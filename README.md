@@ -1,6 +1,6 @@
-# tinydhcpd 
+# tinydhcpd
 
-`tinydhpcd` is (going to be) a tiny DHCPv4 server, aiming for compliance with [RFC2131](https://datatracker.ietf.org/doc/html/rfc2131) and implementation of
+`tinydhcpd` is (going to be) a tiny DHCPv4 server, aiming for compliance with [RFC2131](https://datatracker.ietf.org/doc/html/rfc2131) and implementation of
 most common DHCP options.
 
 - [Getting started](#getting-started)
@@ -16,7 +16,7 @@ To compile and run `tinydhcpd`, you need the following:
 - Linux with `epoll` support
 - [libconfig++](https://github.com/hyperrealm/libconfig)
   - Ubuntu: `apt install libconfig++-dev`
-  - Gentoo: `emerge libconfig`  
+  - Gentoo: `emerge libconfig`
 - [Meson](https://mesonbuild.com/)
 - A compiler supporting C++20 designated initializers (GCC 8 or later, Clang 10 or later)
 
