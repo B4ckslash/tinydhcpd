@@ -14,6 +14,7 @@ private:
   int socket_fd;
   SocketObserver &observer;
   const struct sockaddr_in listen_address;
+  in_addr_t server_ip;
   std::queue<std::pair<struct sockaddr, DhcpDatagram>> send_queue;
   void die(std::string error_msg);
   uint32_t extract_destination_ip(struct msghdr &message_header);

@@ -3,6 +3,7 @@
 #include <byteswap.h>
 #include <net/if.h>
 #include <string.h>
+#include <sys/ioctl.h>
 
 #include "utils.hpp"
 
@@ -15,7 +16,7 @@ Socket::Socket(const struct in_addr &address, const std::string &iface_name,
                                          .sin_port = htons(PORT),
                                          .sin_addr = address,
                                          .sin_zero = {}},
-      send_queue() {
+      server_ip(address.s_addr), send_queue() {
   socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
   if (socket_fd == -1) {
     die("Failed to create socket: ");
@@ -28,6 +29,7 @@ Socket::Socket(const struct in_addr &address, const std::string &iface_name,
 
   if (!iface_name.empty()) {
     struct ifreq ireq {};
+    ireq.ifr_addr.sa_family = AF_INET;
     std::snprintf(ireq.ifr_name, sizeof(ireq.ifr_name), "%s",
                   iface_name.c_str());
     if (setsockopt(socket_fd, SOL_SOCKET, SO_BINDTODEVICE, (const void *)&ireq,
@@ -36,6 +38,12 @@ Socket::Socket(const struct in_addr &address, const std::string &iface_name,
       msg.append(iface_name);
       msg.append(": ");
       die(msg);
+    }
+    if (server_ip == INADDR_ANY) {
+      if (ioctl(socket_fd, SIOCGIFADDR, &ireq) < 0) {
+        die("ioctl SIOCGIFADDR failed: ");
+      }
+      server_ip = ((struct sockaddr_in *)&ireq.ifr_addr)->sin_addr.s_addr;
     }
   }
 
@@ -72,7 +80,7 @@ void Socket::handle_epollin() {
     DhcpDatagram datagram =
         DhcpDatagram::from_buffer(raw_data_buffer, DGRAM_SIZE);
     if (datagram.server_ip == static_cast<uint32_t>(0x0)) {
-      datagram.server_ip = extract_destination_ip(message_header);
+      datagram.server_ip = server_ip;
     }
     observer.handle_recv(datagram);
   } catch (std::invalid_argument &ex) {
@@ -99,6 +107,8 @@ uint32_t Socket::extract_destination_ip(struct msghdr &message_header) {
         control_message->cmsg_type != IP_PKTINFO) {
       continue;
     }
+    // TODO this doesn't get the actual interface address, have to get that some
+    // other way
     struct in_pktinfo *packet_info =
         reinterpret_cast<struct in_pktinfo *>(CMSG_DATA(control_message));
     return bswap_32(packet_info->ipi_addr.s_addr);
