@@ -22,8 +22,7 @@ void parse_configuration(ProgramConfiguration &optval) {
         "One of (listen-address|interface) must be given!");
   }
 
-  if(!configuration.lookupValue(LEASE_FILE_KEY, optval.lease_file_path))
-  {
+  if (!configuration.lookupValue(LEASE_FILE_KEY, optval.lease_file_path)) {
     optval.lease_file_path = "/var/lib/tinydhcpd/leases";
   }
 
@@ -58,6 +57,11 @@ void parse_configuration(ProgramConfiguration &optval) {
 
   if (subnet_parsed_cfg.exists(OPTIONS_KEY)) {
     parse_options(subnet_parsed_cfg, subnet_cfg);
+  }
+
+  if (!subnet_parsed_cfg.lookupValue(LEASE_TIME_KEY,
+                                     subnet_cfg.lease_time_seconds)) {
+    subnet_cfg.lease_time_seconds = DEFAULT_LEASE_TIME;
   }
 
   optval.subnet_config = subnet_cfg;
@@ -95,7 +99,8 @@ void parse_hosts(libconfig::Setting &subnet_cfg_block,
     if (currentGroup.lookupValue(HOSTS_TYPE_ETHER_KEY, config_ether_addr) &&
         currentGroup.lookupValue(HOSTS_FIXED_ADDRESS_KEY,
                                  config_fixed_address)) {
-      struct ether_addr *parsed_ether_addr = ether_aton(config_ether_addr.c_str());
+      struct ether_addr *parsed_ether_addr =
+          ether_aton(config_ether_addr.c_str());
       in_addr parsed_ip4_addr = {};
       in_addr_t netmasked_subnet_address =
           subnet_cfg.subnet_address.s_addr & subnet_cfg.netmask.s_addr;

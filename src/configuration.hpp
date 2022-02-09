@@ -17,12 +17,15 @@ const std::string RANGE_END_KEY = "range-end";
 const std::string OPTIONS_KEY = "options";
 const std::string HOSTS_KEY = "hosts";
 const std::string LEASE_FILE_KEY = "lease-file";
+const std::string LEASE_TIME_KEY = "lease-time";
 
 const std::string HOSTS_TYPE_ETHER_KEY = "ether";
 const std::string HOSTS_FIXED_ADDRESS_KEY = "fixed-address";
 
 const std::string OPTIONS_ROUTER_KEY = "routers";
 const std::string OPTIONS_DNS_SERVERS_KEY = "domain-name-servers";
+
+constexpr uint32_t DEFAULT_LEASE_TIME = 24 * 60 * 60; // 24h in seconds
 
 const std::map<std::string, OptionTag> key_tag_mapping = {
     {OPTIONS_ROUTER_KEY, OptionTag::ROUTERS},

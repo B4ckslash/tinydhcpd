@@ -1,8 +1,8 @@
 #pragma once
 
+#include <netinet/in.h>
 #include <queue>
 #include <string>
-#include <netinet/in.h>
 
 #include "socket_observer.hpp"
 

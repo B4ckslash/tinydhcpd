@@ -18,8 +18,11 @@ private:
   DhcpDatagram
   create_skeleton_reply_datagram(const DhcpDatagram &request_datagram);
   std::fstream lease_file;
-  std::map<in_addr_t, std::pair<std::array<uint8_t,16>,uint64_t>> active_leases;
+  std::map<in_addr_t, std::pair<std::array<uint8_t, 16>, uint64_t>>
+      active_leases;
   void load_leases();
+  void update_leases();
+  uint64_t get_current_time();
   void handle_discovery(const DhcpDatagram &datagram);
   void handle_request(const DhcpDatagram &datagram);
   void handle_release(const DhcpDatagram &datagram);

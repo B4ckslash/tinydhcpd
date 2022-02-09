@@ -1,22 +1,29 @@
 #include "daemon.hpp"
 
-#include "datagram.hpp"
-#include "utils.hpp"
 #include <arpa/inet.h>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
+#include <linux/if_packet.h>
 #include <netinet/in.h>
 #include <string>
+#include <sys/socket.h>
 #include <utility>
+
+#include "datagram.hpp"
+#include "utils.hpp"
 
 namespace tinydhcpd {
 volatile std::sig_atomic_t last_signal;
 
 constexpr uint8_t DHCP_TYPE_DISCOVER = 1;
+constexpr uint8_t DHCP_TYPE_OFFER = 2;
 constexpr uint8_t DHCP_TYPE_REQUEST = 3;
+constexpr uint8_t DHCP_TYPE_DECLINE = 4;
+constexpr uint8_t DHCP_TYPE_ACK = 5;
+constexpr uint8_t DHCP_TYPE_NAK = 6;
 constexpr uint8_t DHCP_TYPE_RELEASE = 7;
 constexpr uint8_t DHCP_TYPE_INFORM = 8;
 
@@ -73,8 +80,30 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
 
 void Daemon::handle_request(const DhcpDatagram &datagram) {
   DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
-  in_addr_t requested_address = to_number<in_addr_t>(datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS));
-  //TODO finish
+  in_addr_t requested_address = to_number<in_addr_t>(
+      datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS));
+  update_leases();
+  if (!active_leases.contains(requested_address) ||
+      active_leases[requested_address].first == datagram.hw_addr) {
+    reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_ACK};
+    reply.assigned_ip = requested_address;
+
+    auto renew_time_network_order_array =
+        to_network_byte_array(netconfig.lease_time_seconds / 2);
+    auto rebind_time_network_order_array =
+        to_network_byte_array(netconfig.lease_time_seconds);
+    reply.options[OptionTag::DHCP_RENEW_TIME] =
+        std::vector<uint8_t>(renew_time_network_order_array.begin(),
+                             renew_time_network_order_array.end());
+    reply.options[OptionTag::DHCP_REBINDING_TIME] =
+        std::vector<uint8_t>(rebind_time_network_order_array.begin(),
+                             rebind_time_network_order_array.end());
+
+    const uint64_t current_time_seconds = get_current_time();
+    active_leases[requested_address] = std::make_pair(
+        datagram.hw_addr, current_time_seconds + netconfig.lease_time_seconds);
+    // TODO inject address into arp cache, send packet
+  }
 }
 
 DhcpDatagram
@@ -84,17 +113,23 @@ Daemon::create_skeleton_reply_datagram(const DhcpDatagram &request_datagram) {
                     .hwaddr_len = request_datagram.hwaddr_len,
                     .transaction_id = request_datagram.transaction_id,
                     .server_ip = request_datagram.server_ip};
-  std::copy(std::cbegin(request_datagram.hw_addr),
-            std::cend(request_datagram.hw_addr), skel.hw_addr);
+  std::copy(request_datagram.hw_addr.begin(), request_datagram.hw_addr.end(),
+            skel.hw_addr.begin());
   return skel;
+}
+
+void Daemon::update_leases() {
+  const uint64_t current_time_seconds = get_current_time();
+  for (auto const &[inet_addr, val] : active_leases) {
+    if (val.second <= current_time_seconds) {
+      active_leases.erase(inet_addr);
+    }
+  }
 }
 
 void Daemon::load_leases() {
   std::string current_line;
-  const uint64_t current_time_seconds =
-      std::chrono::duration_cast<std::chrono::seconds>(
-          std::chrono::system_clock::now().time_since_epoch())
-          .count();
+  const uint64_t current_time_seconds = get_current_time();
 
   while (std::getline(lease_file, current_line)) {
     size_t first_delim_pos = current_line.find_first_of(LEASE_FILE_DELIMITER);
@@ -129,5 +164,12 @@ void Daemon::load_leases() {
     inet_aton(ipaddr_string.c_str(), &ip_addr);
     active_leases[ip_addr.s_addr] = std::make_pair(hwaddr, timeout_timestamp);
   }
+}
+
+uint64_t Daemon::get_current_time() {
+  return static_cast<uint64_t>(
+      std::chrono::duration_cast<std::chrono::seconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count());
 }
 } // namespace tinydhcpd

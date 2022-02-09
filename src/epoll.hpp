@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 namespace tinydhcpd {
-extern volatile std::sig_atomic_t last_signal; //defined in daemon.cpp
+extern volatile std::sig_atomic_t last_signal; // defined in daemon.cpp
 
 template <class T> class Epoll {
   static constexpr size_t MAX_EVENTS = 1;
@@ -19,7 +19,8 @@ template <class T> class Epoll {
 
 public:
   Epoll(T &subject, uint32_t events)
-      : subject(subject), epoll_ctl_cfg{.events = events, .data={}}, events() {
+      : subject(subject), epoll_ctl_cfg{.events = events, .data = {}},
+        events() {
     epoll_fd = epoll_create1(0);
     if (epoll_fd == -1) {
       throw std::runtime_error("Failed to create epoll structure!");

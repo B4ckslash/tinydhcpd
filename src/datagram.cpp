@@ -56,7 +56,7 @@ DhcpDatagram DhcpDatagram::from_buffer(uint8_t *buffer, int buflen) {
       convert_network_byte_array_to_uint32(buffer + SERVER_IP_OFFSET);
 
   std::copy(buffer + CLIENT_HWADDR_OFFSET, buffer + SERVER_HOSTNAME_OFFSET - 1,
-            datagram.hw_addr);
+            datagram.hw_addr.begin());
   uint32_t cookie = ntohl(*(uint32_t *)(buffer + MAGIC_COOKIE_OFFSET));
   if (cookie != DHCP_MAGIC_COOKIE) {
     std::cout << cookie << " expected " << DHCP_MAGIC_COOKIE << std::endl;

@@ -20,6 +20,8 @@ enum struct OptionTag : uint8_t {
   STATIC_ROUTES = 33,
   REQUESTED_IP_ADDRESS = 50,
   DHCP_MESSAGE_TYPE = 53,
+  DHCP_RENEW_TIME = 58,
+  DHCP_REBINDING_TIME = 59,
   OPTIONS_END = 255
 };
 
@@ -37,7 +39,7 @@ struct DhcpDatagram {
   uint32_t server_ip;
   uint32_t relay_agent_ip;
 
-  uint8_t hw_addr[16];
+  std::array<uint8_t, 16> hw_addr;
 
   std::map<OptionTag, std::vector<uint8_t>> options;
 
