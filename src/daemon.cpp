@@ -5,10 +5,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <linux/if_packet.h>
 #include <netinet/in.h>
 #include <string>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <utility>
 
@@ -26,6 +28,8 @@ constexpr uint8_t DHCP_TYPE_ACK = 5;
 constexpr uint8_t DHCP_TYPE_NAK = 6;
 constexpr uint8_t DHCP_TYPE_RELEASE = 7;
 constexpr uint8_t DHCP_TYPE_INFORM = 8;
+
+constexpr uint8_t DHCP_CLIENT_PORT = 68;
 
 const std::string LEASE_FILE_DELIMITER = ",";
 
@@ -46,6 +50,9 @@ Daemon::Daemon(const struct in_addr &address, const std::string &iface_name,
 void Daemon::handle_recv(DhcpDatagram &datagram) {
   std::cout << string_format("XID: %#010x", datagram.transaction_id)
             << std::endl;
+  if (datagram.opcode != 0x1) {
+    return;
+  }
   std::for_each(datagram.options.begin(), datagram.options.end(),
                 [](const auto &option) {
                   std::cout << string_format("Tag %u | Length %u | Value(s) ",
@@ -102,7 +109,30 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
     const uint64_t current_time_seconds = get_current_time();
     active_leases[requested_address] = std::make_pair(
         datagram.hw_addr, current_time_seconds + netconfig.lease_time_seconds);
-    // TODO inject address into arp cache, send packet
+
+    struct sockaddr_in destination {
+      .sin_port = DHCP_CLIENT_PORT, .sin_addr = {.s_addr = requested_address},
+    };
+
+    struct sockaddr arp_hwaddr {
+      .sa_family = datagram.hwaddr_type, .sa_data = {}
+    };
+    std::copy(datagram.hw_addr.cbegin(),
+              datagram.hw_addr.cbegin() + datagram.hwaddr_len,
+              arp_hwaddr.sa_data);
+
+    struct arpreq areq {
+      .arp_pa = {}, .arp_ha = arp_hwaddr, .arp_flags = ATF_COM,
+      .arp_netmask = {}, .arp_dev = {}
+    };
+    std::copy(&destination, &destination + sizeof(struct sockaddr_in),
+              reinterpret_cast<struct sockaddr_in *>(&areq.arp_pa));
+    std::memcpy(areq.arp_dev, datagram.recv_iface.c_str(),
+                sizeof(areq.arp_dev));
+    if (ioctl(socket, SIOCSARP, &areq) != 0)
+      std::cerr << "Failed to inject into arp cache!" << std::endl;
+
+    socket.enqueue_datagram(destination, reply);
   }
 }
 

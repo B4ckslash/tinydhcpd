@@ -82,6 +82,9 @@ void Socket::handle_epollin() {
     if (datagram.server_ip == static_cast<uint32_t>(0x0)) {
       datagram.server_ip = server_ip;
     }
+    auto iface_info = extract_interface_info(message_header);
+    datagram.recv_addr = iface_info.first;
+    datagram.recv_iface = iface_info.second;
     observer.handle_recv(datagram);
   } catch (std::invalid_argument &ex) {
     std::cerr << ex.what() << std::endl;
@@ -93,13 +96,15 @@ void Socket::handle_epollout() {
   if (send_queue.empty())
     return;
 
-  struct sockaddr destination = send_queue.front().first;
+  struct sockaddr_in destination = send_queue.front().first;
   std::vector<uint8_t> data = send_queue.front().second.to_byte_vector();
-  sendto(socket_fd, data.data(), data.size(), MSG_DONTWAIT, &destination,
+  sendto(socket_fd, data.data(), data.size(), MSG_DONTWAIT,
+         reinterpret_cast<struct sockaddr *>(&destination),
          sizeof(destination));
 }
 
-uint32_t Socket::extract_destination_ip(struct msghdr &message_header) {
+std::pair<in_addr_t, std::string>
+Socket::extract_interface_info(struct msghdr &message_header) {
   for (struct cmsghdr *control_message = CMSG_FIRSTHDR(&message_header);
        control_message != nullptr;
        control_message = CMSG_NXTHDR(&message_header, control_message)) {
@@ -107,16 +112,23 @@ uint32_t Socket::extract_destination_ip(struct msghdr &message_header) {
         control_message->cmsg_type != IP_PKTINFO) {
       continue;
     }
-    // TODO this doesn't get the actual interface address, have to get that some
-    // other way
     struct in_pktinfo *packet_info =
         reinterpret_cast<struct in_pktinfo *>(CMSG_DATA(control_message));
-    return bswap_32(packet_info->ipi_addr.s_addr);
+    const size_t if_index = packet_info->ipi_ifindex;
+    struct ifreq ireq {};
+    ireq.ifr_addr.sa_family = AF_INET;
+    ireq.ifr_ifindex = if_index;
+    if (ioctl(socket_fd, SIOCGIFNAME, &ireq) != 0)
+      die("Failed to get interface name: ");
+    ioctl(socket_fd, SIOCGIFADDR, &ireq);
+    return std::make_pair(
+        reinterpret_cast<struct sockaddr_in *>(&ireq.ifr_addr)->sin_addr.s_addr,
+        ireq.ifr_name);
   }
-  return 0;
+  die("No control message with packet info! ");
 }
 
-void Socket::enqueue_datagram(struct sockaddr &destination,
+void Socket::enqueue_datagram(struct sockaddr_in &destination,
                               DhcpDatagram &datagram) {
   send_queue.push(std::make_pair(destination, datagram));
 }

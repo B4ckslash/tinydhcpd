@@ -2,6 +2,7 @@
 
 #include <map>
 #include <netinet/in.h>
+#include <string>
 #include <vector>
 
 namespace tinydhcpd {
@@ -38,6 +39,9 @@ struct DhcpDatagram {
   uint32_t assigned_ip;
   uint32_t server_ip;
   uint32_t relay_agent_ip;
+
+  in_addr_t recv_addr;
+  std::string recv_iface;
 
   std::array<uint8_t, 16> hw_addr;
 

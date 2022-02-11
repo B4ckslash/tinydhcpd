@@ -15,16 +15,18 @@ private:
   SocketObserver &observer;
   const struct sockaddr_in listen_address;
   in_addr_t server_ip;
-  std::queue<std::pair<struct sockaddr, DhcpDatagram>> send_queue;
-  void die(std::string error_msg);
-  uint32_t extract_destination_ip(struct msghdr &message_header);
+  std::queue<std::pair<struct sockaddr_in, DhcpDatagram>> send_queue;
+  [[noreturn]] void die(std::string error_msg);
+  std::pair<in_addr_t, std::string>
+  extract_interface_info(struct msghdr &message_header);
 
 public:
   Socket(const struct in_addr &address, const std::string &iface_name,
          SocketObserver &observer);
   ~Socket() noexcept;
   operator int();
-  void enqueue_datagram(struct sockaddr &destination, DhcpDatagram &datagram);
+  void enqueue_datagram(struct sockaddr_in &destination,
+                        DhcpDatagram &datagram);
   void handle_epollin();
   void handle_epollout();
 };
