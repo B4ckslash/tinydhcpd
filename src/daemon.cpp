@@ -88,13 +88,20 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
 
 void Daemon::handle_request(const DhcpDatagram &datagram) {
   DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
-  in_addr_t requested_address = to_number<in_addr_t>(
-      datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS));
+  in_addr_t requested_address_netorder = htonl(to_number<in_addr_t>(
+      datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS)));
+  if ((requested_address_netorder & netconfig.netmask.s_addr) !=
+      netconfig.subnet_address.s_addr) {
+    std::cerr << "Requested address "
+              << inet_ntoa(in_addr{.s_addr = requested_address_netorder})
+              << " is not in range!" << std::endl;
+    return;
+  }
   update_leases();
-  if (!active_leases.contains(requested_address) ||
-      active_leases[requested_address].first == datagram.hw_addr) {
+  if (!active_leases.contains(requested_address_netorder) ||
+      active_leases[requested_address_netorder].first == datagram.hw_addr) {
     reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_ACK};
-    reply.assigned_ip = requested_address;
+    reply.assigned_ip = ntohl(requested_address_netorder);
 
     auto renew_time_network_order_array =
         to_byte_array(netconfig.lease_time_seconds / 2);
@@ -108,12 +115,12 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
                              rebind_time_network_order_array.end());
 
     const uint64_t current_time_seconds = get_current_time();
-    active_leases[requested_address] = std::make_pair(
+    active_leases[requested_address_netorder] = std::make_pair(
         datagram.hw_addr, current_time_seconds + netconfig.lease_time_seconds);
 
     struct sockaddr_in destination {
       .sin_family = AF_INET, .sin_port = htons(DHCP_CLIENT_PORT),
-      .sin_addr = {.s_addr = htonl(requested_address)},
+      .sin_addr = {.s_addr = requested_address_netorder},
     };
 
     struct sockaddr arp_hwaddr {

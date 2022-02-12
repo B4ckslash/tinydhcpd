@@ -99,7 +99,7 @@ void Socket::handle_epollout() {
 
   struct sockaddr_in destination = send_queue.front().first;
   std::vector<uint8_t> data = send_queue.front().second.to_byte_vector();
-  if (sendto(socket_fd, data.data(), data.size(), 0,
+  if (sendto(socket_fd, data.data(), data.size(), MSG_DONTWAIT,
              reinterpret_cast<struct sockaddr *>(&destination),
              sizeof(destination)) != 0) {
     std::cerr << "Send failed!" << std::endl;
