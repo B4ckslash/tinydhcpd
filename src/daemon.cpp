@@ -29,7 +29,7 @@ constexpr uint8_t DHCP_TYPE_NAK = 6;
 constexpr uint8_t DHCP_TYPE_RELEASE = 7;
 constexpr uint8_t DHCP_TYPE_INFORM = 8;
 
-constexpr uint8_t DHCP_CLIENT_PORT = 68;
+constexpr uint16_t DHCP_CLIENT_PORT = 68;
 
 const std::string LEASE_FILE_DELIMITER = ",";
 
@@ -70,6 +70,7 @@ void Daemon::handle_recv(DhcpDatagram &datagram) {
     break;
   case DHCP_TYPE_REQUEST:
     std::cout << "DHCPREQUEST" << std::endl;
+    handle_request(datagram);
     break;
   case DHCP_TYPE_RELEASE:
     break;
@@ -96,9 +97,9 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
     reply.assigned_ip = requested_address;
 
     auto renew_time_network_order_array =
-        to_network_byte_array(netconfig.lease_time_seconds / 2);
+        to_byte_array(netconfig.lease_time_seconds / 2);
     auto rebind_time_network_order_array =
-        to_network_byte_array(netconfig.lease_time_seconds);
+        to_byte_array(netconfig.lease_time_seconds);
     reply.options[OptionTag::DHCP_RENEW_TIME] =
         std::vector<uint8_t>(renew_time_network_order_array.begin(),
                              renew_time_network_order_array.end());
@@ -111,7 +112,8 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
         datagram.hw_addr, current_time_seconds + netconfig.lease_time_seconds);
 
     struct sockaddr_in destination {
-      .sin_port = DHCP_CLIENT_PORT, .sin_addr = {.s_addr = requested_address},
+      .sin_family = AF_INET, .sin_port = htons(DHCP_CLIENT_PORT),
+      .sin_addr = {.s_addr = htonl(requested_address)},
     };
 
     struct sockaddr arp_hwaddr {
@@ -125,12 +127,11 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
       .arp_pa = {}, .arp_ha = arp_hwaddr, .arp_flags = ATF_COM,
       .arp_netmask = {}, .arp_dev = {}
     };
-    std::copy(&destination, &destination + sizeof(struct sockaddr_in),
-              reinterpret_cast<struct sockaddr_in *>(&areq.arp_pa));
-    std::memcpy(areq.arp_dev, datagram.recv_iface.c_str(),
-                sizeof(areq.arp_dev));
+    std::memcpy(&areq.arp_pa, &destination, sizeof(struct sockaddr_in));
+    std::memcpy(&areq.arp_dev, datagram.recv_iface.c_str(),
+                datagram.recv_iface.length() + 1);
     if (ioctl(socket, SIOCSARP, &areq) != 0)
-      std::cerr << "Failed to inject into arp cache!" << std::endl;
+      std::cerr << "Failed to inject into arp cache!" << errno << std::endl;
 
     socket.enqueue_datagram(destination, reply);
   }
@@ -142,7 +143,7 @@ Daemon::create_skeleton_reply_datagram(const DhcpDatagram &request_datagram) {
                     .hwaddr_type = request_datagram.hwaddr_type,
                     .hwaddr_len = request_datagram.hwaddr_len,
                     .transaction_id = request_datagram.transaction_id,
-                    .server_ip = request_datagram.server_ip};
+                    .server_ip = request_datagram.recv_addr};
   std::copy(request_datagram.hw_addr.begin(), request_datagram.hw_addr.end(),
             skel.hw_addr.begin());
   return skel;

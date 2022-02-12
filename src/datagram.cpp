@@ -1,5 +1,4 @@
 #include "datagram.hpp"
-#include "utils.hpp"
 
 #include <arpa/inet.h>
 
@@ -25,7 +24,7 @@ const int BOOT_FILE_NAME_OFFSET = 108;
 const int MAGIC_COOKIE_OFFSET = 236;
 const int OPTIONS_OFFSET = 240;
 
-const int DHCP_MAGIC_COOKIE = 0x63825363;
+const uint32_t DHCP_MAGIC_COOKIE = 0x63825363;
 
 const std::map<OptionTag, uint8_t> predefined_option_lengths = {
     {OptionTag::PAD, 0},
@@ -46,7 +45,7 @@ DhcpDatagram DhcpDatagram::from_buffer(uint8_t *buffer, int buflen) {
       convert_network_byte_array_to_uint32(buffer + TRANSACTION_ID_OFFSET);
   datagram.secs_passed =
       convert_network_byte_array_to_uint16(buffer + SECS_PASSED_OFFSET);
-  datagram.flags = convert_network_byte_array_to_uint16(buffer + FLAGS_OFFSET);
+  datagram.flags = *reinterpret_cast<uint16_t *>(buffer + FLAGS_OFFSET);
 
   datagram.client_ip =
       convert_network_byte_array_to_uint32(buffer + CLIENT_IP_OFFSET);
@@ -98,7 +97,34 @@ DhcpDatagram::parse_options(const uint8_t *options_buffer, size_t buffer_size) {
 }
 
 std::vector<uint8_t> DhcpDatagram::to_byte_vector() {
-  return std::vector<uint8_t>();
+  std::vector<uint8_t> byte_vector;
+  byte_vector.push_back(opcode);
+  byte_vector.push_back(hwaddr_type);
+  byte_vector.push_back(hwaddr_len);
+  byte_vector.push_back(0x0); // hops
+  convert_number_to_byte_array_and_push(byte_vector, transaction_id);
+  convert_number_to_network_byte_array_and_push(byte_vector, secs_passed);
+  byte_vector.push_back(0x0); // flags
+  byte_vector.push_back(0x0); // flags
+  convert_number_to_byte_array_and_push(byte_vector, client_ip);
+  convert_number_to_byte_array_and_push(byte_vector, assigned_ip);
+  convert_number_to_byte_array_and_push(byte_vector, server_ip);
+  convert_number_to_byte_array_and_push(byte_vector, relay_agent_ip);
+  std::copy(hw_addr.begin(), hw_addr.end(), std::back_inserter(byte_vector));
+  std::fill_n(std::back_inserter(byte_vector), 192, 0x0);
+  byte_vector.push_back((DHCP_MAGIC_COOKIE & (0xff << 24)) >> 24);
+  byte_vector.push_back((DHCP_MAGIC_COOKIE & (0xff << 16)) >> 16);
+  byte_vector.push_back((DHCP_MAGIC_COOKIE & (0xff << 8)) >> 8);
+  byte_vector.push_back(DHCP_MAGIC_COOKIE & 0xff);
+  for (auto &entry : options) {
+    byte_vector.push_back(static_cast<uint8_t>(entry.first));
+    byte_vector.push_back(static_cast<uint8_t>(entry.second.size()));
+    std::copy(entry.second.begin(), entry.second.end(),
+              std::back_inserter(byte_vector));
+  }
+  byte_vector.push_back(static_cast<uint8_t>(OptionTag::OPTIONS_END));
+
+  return byte_vector;
 }
 
 uint16_t convert_network_byte_array_to_uint16(uint8_t *array) {
@@ -108,4 +134,5 @@ uint16_t convert_network_byte_array_to_uint16(uint8_t *array) {
 uint32_t convert_network_byte_array_to_uint32(uint8_t *array) {
   return ntohl(*(uint32_t *)array);
 }
+
 } // namespace tinydhcpd

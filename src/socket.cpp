@@ -93,14 +93,18 @@ void Socket::handle_epollin() {
 }
 
 void Socket::handle_epollout() {
-  if (send_queue.empty())
+  if (send_queue.empty()) {
     return;
+  }
 
   struct sockaddr_in destination = send_queue.front().first;
   std::vector<uint8_t> data = send_queue.front().second.to_byte_vector();
-  sendto(socket_fd, data.data(), data.size(), MSG_DONTWAIT,
-         reinterpret_cast<struct sockaddr *>(&destination),
-         sizeof(destination));
+  if (sendto(socket_fd, data.data(), data.size(), 0,
+             reinterpret_cast<struct sockaddr *>(&destination),
+             sizeof(destination)) != 0) {
+    std::cerr << "Send failed!" << std::endl;
+  }
+  send_queue.pop();
 }
 
 std::pair<in_addr_t, std::string>
@@ -114,16 +118,18 @@ Socket::extract_interface_info(struct msghdr &message_header) {
     }
     struct in_pktinfo *packet_info =
         reinterpret_cast<struct in_pktinfo *>(CMSG_DATA(control_message));
-    const size_t if_index = packet_info->ipi_ifindex;
+    const int if_index = packet_info->ipi_ifindex;
     struct ifreq ireq {};
     ireq.ifr_addr.sa_family = AF_INET;
     ireq.ifr_ifindex = if_index;
     if (ioctl(socket_fd, SIOCGIFNAME, &ireq) != 0)
       die("Failed to get interface name: ");
     ioctl(socket_fd, SIOCGIFADDR, &ireq);
+    std::string iface_name(ireq.ifr_name);
     return std::make_pair(
-        reinterpret_cast<struct sockaddr_in *>(&ireq.ifr_addr)->sin_addr.s_addr,
-        ireq.ifr_name);
+        ntohl(reinterpret_cast<struct sockaddr_in *>(&ireq.ifr_addr)
+                  ->sin_addr.s_addr),
+        iface_name);
   }
   die("No control message with packet info! ");
 }
