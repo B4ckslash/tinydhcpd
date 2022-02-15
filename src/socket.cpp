@@ -26,6 +26,10 @@ Socket::Socket(const struct in_addr &address, const std::string &iface_name,
       0) {
     die("Failed to set socket option IP_PKTINFO: ");
   }
+  if (setsockopt(socket_fd, SOL_SOCKET, SO_BROADCAST, &enable, sizeof(enable)) <
+      0) {
+    die("Failed to set socket option SO_BROADCAST: ");
+  }
 
   if (!iface_name.empty()) {
     struct ifreq ireq {};
@@ -101,7 +105,7 @@ void Socket::handle_epollout() {
   std::vector<uint8_t> data = send_queue.front().second.to_byte_vector();
   if (sendto(socket_fd, data.data(), data.size(), MSG_DONTWAIT,
              reinterpret_cast<struct sockaddr *>(&destination),
-             sizeof(destination)) != 0) {
+             sizeof(destination)) == -1) {
     std::cerr << "Send failed!" << std::endl;
   }
   send_queue.pop();

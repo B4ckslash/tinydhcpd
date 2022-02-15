@@ -8,6 +8,7 @@
 #include <cstring>
 #include <fstream>
 #include <linux/if_packet.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <string>
 #include <sys/ioctl.h>
@@ -84,6 +85,64 @@ void Daemon::handle_recv(DhcpDatagram &datagram) {
 void Daemon::handle_discovery(const DhcpDatagram &datagram) {
   DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
   std::cout << "DHCPDISCOVER" << std::endl;
+  in_addr_t offer_address_host_order = ntohl(netconfig.range_start.s_addr);
+  in_addr_t range_end_host_order = ntohl(netconfig.range_end.s_addr);
+  update_leases();
+  for (auto &entry : active_leases) {
+    if (offer_address_host_order == entry.first) {
+      offer_address_host_order++;
+    }
+    if (offer_address_host_order >= range_end_host_order) {
+      return;
+    } else {
+      break;
+    }
+  }
+  in_addr_t offer_address_netorder = htonl(offer_address_host_order);
+
+  reply.assigned_ip = offer_address_host_order;
+  reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_OFFER};
+
+  auto renew_time_network_order_array =
+      to_byte_array(netconfig.lease_time_seconds / 2);
+  auto rebind_time_network_order_array =
+      to_byte_array(netconfig.lease_time_seconds);
+  reply.options[OptionTag::DHCP_RENEW_TIME] =
+      std::vector<uint8_t>(renew_time_network_order_array.begin(),
+                           renew_time_network_order_array.end());
+  reply.options[OptionTag::DHCP_REBINDING_TIME] =
+      std::vector<uint8_t>(rebind_time_network_order_array.begin(),
+                           rebind_time_network_order_array.end());
+
+  const uint64_t current_time_seconds = get_current_time();
+  active_leases[offer_address_netorder] =
+      std::make_pair(datagram.hw_addr, current_time_seconds + 10);
+
+  struct sockaddr_in destination {
+    .sin_family = AF_INET, .sin_port = htons(DHCP_CLIENT_PORT), .sin_addr = {},
+    .sin_zero = {}
+  };
+  if ((datagram.flags & 0x8000) != 0) {
+    struct ifreq ireq;
+    std::memcpy(&ireq.ifr_name, datagram.recv_iface.c_str(),
+                datagram.recv_iface.length() + 1);
+    if (ioctl(socket, SIOCGIFBRDADDR, &ireq) != 0) {
+      std::cerr << "Failed to get broadcast address! Falling back to manual "
+                   "calculation. Error: "
+                << errno << std::endl;
+      destination.sin_addr.s_addr =
+          ((datagram.recv_addr & netconfig.netmask.s_addr) |
+           ~netconfig.netmask.s_addr);
+    } else {
+      destination.sin_addr.s_addr =
+          reinterpret_cast<struct sockaddr_in *>(&ireq.ifr_broadaddr)
+              ->sin_addr.s_addr;
+    }
+  } else {
+    destination.sin_addr.s_addr = offer_address_netorder;
+    inject_into_arp(destination, datagram);
+  }
+  socket.enqueue_datagram(destination, reply);
 }
 
 void Daemon::handle_request(const DhcpDatagram &datagram) {
@@ -123,25 +182,30 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
       .sin_addr = {.s_addr = requested_address_netorder},
     };
 
-    struct sockaddr arp_hwaddr {
-      .sa_family = datagram.hwaddr_type, .sa_data = {}
-    };
-    std::copy(datagram.hw_addr.cbegin(),
-              datagram.hw_addr.cbegin() + datagram.hwaddr_len,
-              arp_hwaddr.sa_data);
-
-    struct arpreq areq {
-      .arp_pa = {}, .arp_ha = arp_hwaddr, .arp_flags = ATF_COM,
-      .arp_netmask = {}, .arp_dev = {}
-    };
-    std::memcpy(&areq.arp_pa, &destination, sizeof(struct sockaddr_in));
-    std::memcpy(&areq.arp_dev, datagram.recv_iface.c_str(),
-                datagram.recv_iface.length() + 1);
-    if (ioctl(socket, SIOCSARP, &areq) != 0)
-      std::cerr << "Failed to inject into arp cache!" << errno << std::endl;
+    inject_into_arp(destination, datagram);
 
     socket.enqueue_datagram(destination, reply);
   }
+}
+
+void Daemon::inject_into_arp(const struct sockaddr_in &destination,
+                             const DhcpDatagram &request_datagram) {
+  struct sockaddr arp_hwaddr {
+    .sa_family = request_datagram.hwaddr_type, .sa_data = {}
+  };
+  std::copy(request_datagram.hw_addr.cbegin(),
+            request_datagram.hw_addr.cbegin() + request_datagram.hwaddr_len,
+            arp_hwaddr.sa_data);
+
+  struct arpreq areq {
+    .arp_pa = {}, .arp_ha = arp_hwaddr, .arp_flags = ATF_COM, .arp_netmask = {},
+    .arp_dev = {}
+  };
+  std::memcpy(&areq.arp_pa, &destination, sizeof(struct sockaddr_in));
+  std::memcpy(&areq.arp_dev, request_datagram.recv_iface.c_str(),
+              request_datagram.recv_iface.length() + 1);
+  if (ioctl(socket, SIOCSARP, &areq) != 0)
+    std::cerr << "Failed to inject into arp cache!" << errno << std::endl;
 }
 
 DhcpDatagram
@@ -150,6 +214,7 @@ Daemon::create_skeleton_reply_datagram(const DhcpDatagram &request_datagram) {
                     .hwaddr_type = request_datagram.hwaddr_type,
                     .hwaddr_len = request_datagram.hwaddr_len,
                     .transaction_id = request_datagram.transaction_id,
+                    .flags = request_datagram.flags,
                     .server_ip = request_datagram.recv_addr};
   std::copy(request_datagram.hw_addr.begin(), request_datagram.hw_addr.end(),
             skel.hw_addr.begin());
@@ -158,9 +223,12 @@ Daemon::create_skeleton_reply_datagram(const DhcpDatagram &request_datagram) {
 
 void Daemon::update_leases() {
   const uint64_t current_time_seconds = get_current_time();
-  for (auto const &[inet_addr, val] : active_leases) {
-    if (val.second <= current_time_seconds) {
-      active_leases.erase(inet_addr);
+  for (auto map_iter = active_leases.cbegin();
+       map_iter != active_leases.cend();) {
+    if (map_iter->second.second <= current_time_seconds) {
+      active_leases.erase(map_iter++);
+    } else {
+      ++map_iter;
     }
   }
 }

@@ -45,7 +45,7 @@ DhcpDatagram DhcpDatagram::from_buffer(uint8_t *buffer, int buflen) {
       convert_network_byte_array_to_uint32(buffer + TRANSACTION_ID_OFFSET);
   datagram.secs_passed =
       convert_network_byte_array_to_uint16(buffer + SECS_PASSED_OFFSET);
-  datagram.flags = *reinterpret_cast<uint16_t *>(buffer + FLAGS_OFFSET);
+  datagram.flags = convert_byte_array_to_uint16(buffer + FLAGS_OFFSET);
 
   datagram.client_ip =
       convert_network_byte_array_to_uint32(buffer + CLIENT_IP_OFFSET);
@@ -104,8 +104,7 @@ std::vector<uint8_t> DhcpDatagram::to_byte_vector() {
   byte_vector.push_back(0x0); // hops
   convert_number_to_byte_array_and_push(byte_vector, transaction_id);
   convert_number_to_network_byte_array_and_push(byte_vector, secs_passed);
-  byte_vector.push_back(0x0); // flags
-  byte_vector.push_back(0x0); // flags
+  convert_number_to_byte_array_and_push(byte_vector, flags);
   convert_number_to_byte_array_and_push(byte_vector, client_ip);
   convert_number_to_byte_array_and_push(byte_vector, assigned_ip);
   convert_number_to_byte_array_and_push(byte_vector, server_ip);
@@ -133,6 +132,14 @@ uint16_t convert_network_byte_array_to_uint16(uint8_t *array) {
 
 uint32_t convert_network_byte_array_to_uint32(uint8_t *array) {
   return ntohl(*(uint32_t *)array);
+}
+
+uint16_t convert_byte_array_to_uint16(uint8_t *array) {
+  return *(reinterpret_cast<uint16_t *>(array));
+}
+
+uint32_t convert_byte_array_to_uint32(uint8_t *array) {
+  return *(reinterpret_cast<uint32_t *>(array));
 }
 
 } // namespace tinydhcpd

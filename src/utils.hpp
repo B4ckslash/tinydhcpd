@@ -41,7 +41,7 @@ std::array<uint8_t, 4> to_network_byte_array(uint32_t number);
 std::array<uint8_t, 2> to_network_byte_array(uint16_t number);
 
 template <typename N> N to_number(std::vector<uint8_t> bytes) {
-  size_t max_size = sizeof(N) / sizeof(uint8_t);
+  constexpr size_t max_size = sizeof(N) / sizeof(uint8_t);
   if (bytes.size() != max_size) {
     throw std::invalid_argument(
         string_format("The given vector is not the right size! Vector: %d | "
@@ -51,7 +51,7 @@ template <typename N> N to_number(std::vector<uint8_t> bytes) {
   N value = 0;
   for (size_t i = 0; i < max_size; i++) {
     uint8_t shift = 8 * (max_size - i - 1);
-    value += bytes[i] << shift;
+    value |= (bytes[i] << shift);
   }
   return value;
 }

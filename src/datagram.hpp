@@ -23,6 +23,7 @@ enum struct OptionTag : uint8_t {
   STATIC_ROUTES = 33,
   REQUESTED_IP_ADDRESS = 50,
   DHCP_MESSAGE_TYPE = 53,
+  SERVER_IDENTIFIER = 54,
   DHCP_RENEW_TIME = 58,
   DHCP_REBINDING_TIME = 59,
   OPTIONS_END = 255
@@ -58,6 +59,8 @@ struct DhcpDatagram {
 
 uint16_t convert_network_byte_array_to_uint16(uint8_t *array);
 uint32_t convert_network_byte_array_to_uint32(uint8_t *array);
+uint16_t convert_byte_array_to_uint16(uint8_t *array);
+uint32_t convert_byte_array_to_uint32(uint8_t *array);
 
 template <typename N>
 void convert_number_to_network_byte_array_and_push(std::vector<uint8_t> &vec,
