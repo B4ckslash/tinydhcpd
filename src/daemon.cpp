@@ -115,7 +115,7 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
                            rebind_time_network_order_array.end());
 
   const uint64_t current_time_seconds = get_current_time();
-  active_leases[offer_address_netorder] =
+  active_leases[offer_address_host_order] =
       std::make_pair(datagram.hw_addr, current_time_seconds + 10);
 
   struct sockaddr_in destination {
@@ -131,8 +131,7 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
                    "calculation. Error: "
                 << errno << std::endl;
       destination.sin_addr.s_addr =
-          ((datagram.recv_addr & netconfig.netmask.s_addr) |
-           ~netconfig.netmask.s_addr);
+          (datagram.recv_addr | ~netconfig.netmask.s_addr);
     } else {
       destination.sin_addr.s_addr =
           reinterpret_cast<struct sockaddr_in *>(&ireq.ifr_broadaddr)
@@ -146,9 +145,10 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
 }
 
 void Daemon::handle_request(const DhcpDatagram &datagram) {
-  DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
   in_addr_t requested_address_netorder = htonl(to_number<in_addr_t>(
       datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS)));
+  in_addr_t requested_address_hostorder = ntohl(requested_address_netorder);
+
   if ((requested_address_netorder & netconfig.netmask.s_addr) !=
       netconfig.subnet_address.s_addr) {
     std::cerr << "Requested address "
@@ -157,10 +157,11 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
     return;
   }
   update_leases();
-  if (!active_leases.contains(requested_address_netorder) ||
-      active_leases[requested_address_netorder].first == datagram.hw_addr) {
+  if (!active_leases.contains(requested_address_hostorder) ||
+      active_leases[requested_address_hostorder].first == datagram.hw_addr) {
+    DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
     reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_ACK};
-    reply.assigned_ip = ntohl(requested_address_netorder);
+    reply.assigned_ip = requested_address_hostorder;
 
     auto renew_time_network_order_array =
         to_byte_array(netconfig.lease_time_seconds / 2);
@@ -174,12 +175,12 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
                              rebind_time_network_order_array.end());
 
     const uint64_t current_time_seconds = get_current_time();
-    active_leases[requested_address_netorder] = std::make_pair(
+    active_leases[requested_address_hostorder] = std::make_pair(
         datagram.hw_addr, current_time_seconds + netconfig.lease_time_seconds);
 
     struct sockaddr_in destination {
       .sin_family = AF_INET, .sin_port = htons(DHCP_CLIENT_PORT),
-      .sin_addr = {.s_addr = requested_address_netorder},
+      .sin_addr = {.s_addr = requested_address_netorder}, .sin_zero = {}
     };
 
     inject_into_arp(destination, datagram);
@@ -234,7 +235,7 @@ void Daemon::update_leases() {
   for (auto map_iter = active_leases.cbegin();
        map_iter != active_leases.cend();) {
     if (map_iter->second.second <= current_time_seconds) {
-      active_leases.erase(map_iter++);
+      map_iter = active_leases.erase(map_iter);
     } else {
       ++map_iter;
     }

@@ -50,7 +50,7 @@ struct DhcpDatagram {
 
   std::map<OptionTag, std::vector<uint8_t>> options;
 
-  static DhcpDatagram from_buffer(uint8_t *buffer, int buflen);
+  static DhcpDatagram from_buffer(uint8_t *buffer, size_t buflen);
 
   std::vector<uint8_t> to_byte_vector();
   static std::map<OptionTag, std::vector<uint8_t>>
