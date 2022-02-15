@@ -214,8 +214,16 @@ Daemon::create_skeleton_reply_datagram(const DhcpDatagram &request_datagram) {
                     .hwaddr_type = request_datagram.hwaddr_type,
                     .hwaddr_len = request_datagram.hwaddr_len,
                     .transaction_id = request_datagram.transaction_id,
+                    .secs_passed = 0x0,
                     .flags = request_datagram.flags,
-                    .server_ip = request_datagram.recv_addr};
+                    .client_ip = INADDR_ANY,
+                    .assigned_ip = INADDR_ANY,
+                    .server_ip = request_datagram.recv_addr,
+                    .relay_agent_ip = INADDR_ANY,
+                    .recv_addr = 0x0,
+                    .recv_iface = "",
+                    .hw_addr = {},
+                    .options = std::map<OptionTag, std::vector<uint8_t>>()};
   std::copy(request_datagram.hw_addr.begin(), request_datagram.hw_addr.end(),
             skel.hw_addr.begin());
   return skel;

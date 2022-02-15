@@ -59,8 +59,6 @@ struct DhcpDatagram {
 
 uint16_t convert_network_byte_array_to_uint16(uint8_t *array);
 uint32_t convert_network_byte_array_to_uint32(uint8_t *array);
-uint16_t convert_byte_array_to_uint16(uint8_t *array);
-uint32_t convert_byte_array_to_uint32(uint8_t *array);
 
 template <typename N>
 void convert_number_to_network_byte_array_and_push(std::vector<uint8_t> &vec,

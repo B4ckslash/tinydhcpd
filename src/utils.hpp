@@ -55,4 +55,14 @@ template <typename N> N to_number(std::vector<uint8_t> bytes) {
   }
   return value;
 }
+
+template <typename N> N to_number(uint8_t *bytes) {
+  constexpr size_t size = sizeof(N) / sizeof(uint8_t);
+  N value = 0;
+  for (size_t i = 0; i < size; i++) {
+    uint8_t shift = 8 * (size - i - 1);
+    value |= (bytes[i] << shift);
+  }
+  return value;
+}
 } // namespace tinydhcpd
