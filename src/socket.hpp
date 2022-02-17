@@ -24,7 +24,13 @@ public:
   Socket(const struct in_addr &address, const std::string &iface_name,
          SocketObserver &observer);
   ~Socket() noexcept;
+  Socket(Socket &&other) noexcept = default;
+  // forbid copy construction, only one socket
+  // instance should be wrapping the fd
+  Socket(Socket &other) = delete;
+
   operator int();
+
   void enqueue_datagram(struct sockaddr_in &destination,
                         DhcpDatagram &datagram);
   void handle_epollin();

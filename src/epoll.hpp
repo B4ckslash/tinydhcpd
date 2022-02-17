@@ -32,13 +32,10 @@ public:
     }
   }
 
-  Epoll(Epoll<T> &&other) : subject(other.subject) { other.subject = nullptr; }
+  Epoll(Epoll<T> &&other) : Epoll() { swap(*this, other); }
 
-  Epoll<T> &operator=(Epoll<T> &&other) {
-    if (this != &other) {
-      subject = other.subject;
-      other.subject = nullptr;
-    }
+  Epoll<T> &operator=(Epoll<T> other) {
+    swap(*this, other);
     return *this;
   }
 
@@ -48,6 +45,14 @@ public:
   // should be wrapping a given subject at any time
   Epoll(const Epoll<T> &other) = delete;
   Epoll<T> &operator=(const Epoll<T> &other) = delete;
+
+  friend void swap(Epoll<T> &first, Epoll<T> &second) noexcept {
+    using std::swap;
+    swap(first.subject, second.subject);
+    swap(first.epoll_fd, second.epoll_fd);
+    swap(first.epoll_ctl_cfg, second.epoll_ctl_cfg);
+    swap(first.events, second.events);
+  }
 
   void poll_loop() {
     while (true) {
