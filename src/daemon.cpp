@@ -85,18 +85,28 @@ void Daemon::handle_recv(DhcpDatagram &datagram) {
 void Daemon::handle_discovery(const DhcpDatagram &datagram) {
   DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
   std::cout << "DHCPDISCOVER" << std::endl;
-  in_addr_t offer_address_host_order = ntohl(netconfig.range_start.s_addr);
-  in_addr_t range_end_host_order = ntohl(netconfig.range_end.s_addr);
-  update_leases();
-  for (auto &entry : active_leases) {
-    if (offer_address_host_order == entry.first) {
-      offer_address_host_order++;
+  struct ether_addr request_hwaddr {};
+  std::copy(datagram.hw_addr.cbegin(),
+            datagram.hw_addr.cbegin() + datagram.hwaddr_len,
+            request_hwaddr.ether_addr_octet);
+  in_addr_t offer_address_host_order = INADDR_ANY;
+  if (!netconfig.fixed_hosts.contains(request_hwaddr)) {
+    offer_address_host_order = ntohl(netconfig.range_start.s_addr);
+    in_addr_t range_end_host_order = ntohl(netconfig.range_end.s_addr);
+    update_leases();
+    for (auto &entry : active_leases) {
+      if (offer_address_host_order == entry.first) {
+        offer_address_host_order++;
+      }
+      if (offer_address_host_order >= range_end_host_order) {
+        return;
+      } else {
+        break;
+      }
     }
-    if (offer_address_host_order >= range_end_host_order) {
-      return;
-    } else {
-      break;
-    }
+  } else {
+    offer_address_host_order =
+        ntohl(netconfig.fixed_hosts[request_hwaddr].s_addr);
   }
   in_addr_t offer_address_netorder = htonl(offer_address_host_order);
 

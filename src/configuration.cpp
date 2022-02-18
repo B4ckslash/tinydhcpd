@@ -122,7 +122,7 @@ void parse_hosts(libconfig::Setting &subnet_cfg_block,
         continue;
       }
 
-      subnet_cfg.fixed_hosts.push_back({*parsed_ether_addr, parsed_ip4_addr});
+      subnet_cfg.fixed_hosts[*parsed_ether_addr] = parsed_ip4_addr;
     }
   }
 }
