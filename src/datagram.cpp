@@ -1,10 +1,6 @@
 #include "datagram.hpp"
 
-#include <arpa/inet.h>
-
-#include <cstdint>
-#include <map>
-#include <stdexcept>
+#include "string-format.hpp"
 
 namespace tinydhcpd {
 const size_t OPCODE_OFFSET = 0;
@@ -125,13 +121,4 @@ std::vector<uint8_t> DhcpDatagram::to_byte_vector() {
 
   return bytes;
 }
-
-uint16_t convert_network_byte_array_to_uint16(uint8_t *array) {
-  return ntohs(to_number<uint16_t>(array));
-}
-
-uint32_t convert_network_byte_array_to_uint32(uint8_t *array) {
-  return ntohl(to_number<uint32_t>(array));
-}
-
 } // namespace tinydhcpd

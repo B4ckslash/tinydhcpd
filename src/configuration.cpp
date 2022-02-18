@@ -4,9 +4,8 @@
 #include <libconfig.h++>
 #include <netinet/ether.h>
 
-#include <string>
-
-#include "utils.hpp"
+#include "bytemanip.hpp"
+#include "string-format.hpp"
 
 namespace tinydhcpd {
 void parse_configuration(ProgramConfiguration &optval) {

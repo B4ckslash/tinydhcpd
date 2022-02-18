@@ -3,20 +3,14 @@
 #include <arpa/inet.h>
 #include <chrono>
 #include <cstddef>
-#include <cstdint>
-#include <cstdlib>
 #include <cstring>
-#include <fstream>
-#include <linux/if_packet.h>
 #include <net/if.h>
 #include <netinet/in.h>
-#include <string>
 #include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <utility>
 
+#include "bytemanip.hpp"
 #include "datagram.hpp"
-#include "utils.hpp"
+#include "string-format.hpp"
 
 namespace tinydhcpd {
 volatile std::sig_atomic_t last_signal;

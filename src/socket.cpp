@@ -1,11 +1,11 @@
 #include "socket.hpp"
 
-#include <byteswap.h>
 #include <net/if.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
 
-#include "utils.hpp"
+#include "bytemanip.hpp"
 
 #define DGRAM_SIZE 576
 
