@@ -24,6 +24,18 @@ std::array<uint8_t, sizeof(N) / sizeof(uint8_t)> to_byte_array(N number) {
   return arr;
 }
 
+template <typename N> std::vector<uint8_t> to_byte_vector(N number) {
+  const size_t size = sizeof(N) / sizeof(uint8_t);
+  std::vector<uint8_t> vec;
+  for (size_t i = 0; i < size; i++) {
+    uint8_t shift =
+        8 * (size - i - 1); // shift value must decrease with increasing array
+                            // index to preserve endianness
+    vec.push_back((number & (((N)0xff) << shift)) >> shift);
+  }
+  return vec;
+}
+
 template <typename N> N to_number(std::vector<uint8_t> bytes) {
   constexpr size_t max_size = sizeof(N) / sizeof(uint8_t);
   if (bytes.size() != max_size) {

@@ -107,16 +107,7 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
   reply.assigned_ip = offer_address_host_order;
   reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_OFFER};
 
-  auto renew_time_network_order_array =
-      to_byte_array(netconfig.lease_time_seconds / 2);
-  auto rebind_time_network_order_array =
-      to_byte_array(netconfig.lease_time_seconds);
-  reply.options[OptionTag::DHCP_RENEW_TIME] =
-      std::vector<uint8_t>(renew_time_network_order_array.begin(),
-                           renew_time_network_order_array.end());
-  reply.options[OptionTag::DHCP_REBINDING_TIME] =
-      std::vector<uint8_t>(rebind_time_network_order_array.begin(),
-                           rebind_time_network_order_array.end());
+  set_requested_options(datagram, reply);
 
   const uint64_t current_time_seconds = get_current_time();
   active_leases[offer_address_host_order] =
@@ -232,6 +223,20 @@ Daemon::create_skeleton_reply_datagram(const DhcpDatagram &request_datagram) {
   std::copy(request_datagram.hw_addr.begin(), request_datagram.hw_addr.end(),
             skel.hw_addr.begin());
   return skel;
+}
+
+void Daemon::set_requested_options(const DhcpDatagram &request,
+                                   DhcpDatagram &reply) {
+  if (!request.options.contains(OptionTag::PARAMETER_REQUEST_LIST)) {
+    return;
+  }
+  for (uint8_t option : request.options.at(OptionTag::PARAMETER_REQUEST_LIST)) {
+    if (!netconfig.defined_options.contains(static_cast<OptionTag>(option))) {
+      continue;
+    }
+    reply.options[static_cast<OptionTag>(option)] =
+        netconfig.defined_options.at(static_cast<OptionTag>(option));
+  }
 }
 
 void Daemon::update_leases() {

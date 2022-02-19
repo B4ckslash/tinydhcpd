@@ -58,10 +58,12 @@ void parse_configuration(ProgramConfiguration &optval) {
     parse_options(subnet_parsed_cfg, subnet_cfg);
   }
 
-  if (!subnet_parsed_cfg.lookupValue(LEASE_TIME_KEY,
-                                     subnet_cfg.lease_time_seconds)) {
-    subnet_cfg.lease_time_seconds = DEFAULT_LEASE_TIME;
-  }
+  uint32_t lease_time_seconds = DEFAULT_LEASE_TIME;
+  subnet_parsed_cfg.lookupValue(LEASE_TIME_KEY, lease_time_seconds);
+  subnet_cfg.defined_options[OptionTag::DHCP_REBINDING_TIME] =
+      to_byte_vector<uint32_t>(lease_time_seconds);
+  subnet_cfg.defined_options[OptionTag::DHCP_RENEW_TIME] =
+      to_byte_vector<uint32_t>(lease_time_seconds / 2);
 
   optval.subnet_config = subnet_cfg;
 }
