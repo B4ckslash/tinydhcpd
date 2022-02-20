@@ -1,7 +1,7 @@
 #pragma once
 
-#include <map>
 #include <netinet/in.h>
+#include <unordered_map>
 
 #include "bytemanip.hpp"
 
@@ -48,12 +48,12 @@ struct DhcpDatagram {
 
   std::array<uint8_t, 16> hw_addr;
 
-  std::map<OptionTag, std::vector<uint8_t>> options;
+  std::unordered_map<OptionTag, std::vector<uint8_t>> options;
 
   static DhcpDatagram from_buffer(uint8_t *buffer, size_t buflen);
 
   std::vector<uint8_t> to_byte_vector();
-  static std::map<OptionTag, std::vector<uint8_t>>
+  static std::unordered_map<OptionTag, std::vector<uint8_t>>
   parse_options(const uint8_t *options_buffer, size_t buffer_size);
 };
 

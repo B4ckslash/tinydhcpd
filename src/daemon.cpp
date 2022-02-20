@@ -158,16 +158,7 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
     reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_ACK};
     reply.assigned_ip = requested_address_hostorder;
 
-    auto renew_time_network_order_array =
-        to_byte_array(netconfig.lease_time_seconds / 2);
-    auto rebind_time_network_order_array =
-        to_byte_array(netconfig.lease_time_seconds);
-    reply.options[OptionTag::DHCP_RENEW_TIME] =
-        std::vector<uint8_t>(renew_time_network_order_array.begin(),
-                             renew_time_network_order_array.end());
-    reply.options[OptionTag::DHCP_REBINDING_TIME] =
-        std::vector<uint8_t>(rebind_time_network_order_array.begin(),
-                             rebind_time_network_order_array.end());
+    set_requested_options(datagram, reply);
 
     const uint64_t current_time_seconds = get_current_time();
     active_leases[requested_address_hostorder] = std::make_pair(
@@ -219,7 +210,8 @@ Daemon::create_skeleton_reply_datagram(const DhcpDatagram &request_datagram) {
                     .recv_addr = 0x0,
                     .recv_iface = "",
                     .hw_addr = {},
-                    .options = std::map<OptionTag, std::vector<uint8_t>>()};
+                    .options =
+                        std::unordered_map<OptionTag, std::vector<uint8_t>>()};
   std::copy(request_datagram.hw_addr.begin(), request_datagram.hw_addr.end(),
             skel.hw_addr.begin());
   return skel;

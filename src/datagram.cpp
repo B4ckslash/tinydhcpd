@@ -22,7 +22,7 @@ const size_t OPTIONS_OFFSET = 240;
 
 const uint32_t DHCP_MAGIC_COOKIE = 0x63825363;
 
-const std::map<OptionTag, uint8_t> predefined_option_lengths = {
+const std::unordered_map<OptionTag, uint8_t> predefined_option_lengths = {
     {OptionTag::PAD, 0},
     {OptionTag::DHCP_MESSAGE_TYPE, 1},
     {OptionTag::SUBNET_MASK, 4},
@@ -63,9 +63,9 @@ DhcpDatagram DhcpDatagram::from_buffer(uint8_t *buffer, size_t buflen) {
   return datagram;
 }
 
-std::map<OptionTag, std::vector<uint8_t>>
+std::unordered_map<OptionTag, std::vector<uint8_t>>
 DhcpDatagram::parse_options(const uint8_t *options_buffer, size_t buffer_size) {
-  std::map<OptionTag, std::vector<uint8_t>> parsed_options;
+  std::unordered_map<OptionTag, std::vector<uint8_t>> parsed_options;
   while (options_buffer < (options_buffer + buffer_size)) {
     OptionTag tag = static_cast<OptionTag>(*options_buffer++);
     if (predefined_option_lengths.contains(tag) &&
@@ -76,7 +76,7 @@ DhcpDatagram::parse_options(const uint8_t *options_buffer, size_t buffer_size) {
       continue;
     }
 
-    uint8_t option_length = *options_buffer++;
+    uint8_t option_length = *(options_buffer++);
     if (predefined_option_lengths.contains(tag) &&
         predefined_option_lengths.at(tag) != option_length) {
       throw std::invalid_argument(
