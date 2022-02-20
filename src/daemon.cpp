@@ -106,6 +106,9 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
 
   reply.assigned_ip = offer_address_host_order;
   reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_OFFER};
+  reply.options[OptionTag::SERVER_IDENTIFIER] =
+      to_byte_vector(datagram.recv_addr);
+  reply.server_ip = datagram.recv_addr;
 
   set_requested_options(datagram, reply);
 
@@ -205,7 +208,7 @@ Daemon::create_skeleton_reply_datagram(const DhcpDatagram &request_datagram) {
                     .flags = request_datagram.flags,
                     .client_ip = INADDR_ANY,
                     .assigned_ip = INADDR_ANY,
-                    .server_ip = request_datagram.recv_addr,
+                    .server_ip = INADDR_ANY,
                     .relay_agent_ip = INADDR_ANY,
                     .recv_addr = 0x0,
                     .recv_iface = "",
