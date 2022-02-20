@@ -103,13 +103,9 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
     // the client has not requested a specific lease, so we just return the
     // remaining lease time
     uint64_t now = get_current_time();
-    uint32_t until_rebind = static_cast<uint32_t>(
+    uint32_t remaining = static_cast<uint32_t>(
         active_leases.at(offer_address_host_order).second - now);
-    uint32_t until_renew = static_cast<uint32_t>(
-        until_rebind - (netconfig.lease_time_seconds / 2));
-    reply.options[OptionTag::DHCP_RENEW_TIME] = to_byte_vector(until_renew);
-    reply.options[OptionTag::DHCP_REBINDING_TIME] =
-        to_byte_vector(until_rebind);
+    reply.options[OptionTag::LEASE_TIME] = to_byte_vector(remaining);
   }
   if (offer_address_host_order == INADDR_ANY) {
     if (!netconfig.fixed_hosts.contains(request_hwaddr)) {
@@ -253,7 +249,8 @@ void Daemon::set_requested_options(const DhcpDatagram &request,
     return;
   }
   for (uint8_t option : request.options.at(OptionTag::PARAMETER_REQUEST_LIST)) {
-    if (!netconfig.defined_options.contains(static_cast<OptionTag>(option))) {
+    if (!netconfig.defined_options.contains(static_cast<OptionTag>(option)) ||
+        reply.options.contains(static_cast<OptionTag>(option))) {
       continue;
     }
     reply.options[static_cast<OptionTag>(option)] =

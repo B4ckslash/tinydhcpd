@@ -56,18 +56,15 @@ void parse_configuration(ProgramConfiguration &optval) {
     parse_options(subnet_parsed_cfg, subnet_cfg);
   }
 
-  // reverse endianness because the bytes are put as-is, but
+  // convert to host long because the bytes are sent as-is, but
   // inet_aton puts them into network order (i.e. big endian)
   subnet_cfg.defined_options[OptionTag::SUBNET_MASK] =
       to_byte_vector(ntohl(subnet_cfg.netmask.s_addr));
 
   uint32_t lease_time_seconds = DEFAULT_LEASE_TIME;
   subnet_parsed_cfg.lookupValue(LEASE_TIME_KEY, lease_time_seconds);
-  subnet_cfg.defined_options[OptionTag::DHCP_REBINDING_TIME] =
+  subnet_cfg.defined_options[OptionTag::LEASE_TIME] =
       to_byte_vector(lease_time_seconds);
-  subnet_cfg.defined_options[OptionTag::DHCP_RENEW_TIME] =
-      to_byte_vector(lease_time_seconds / 2);
-
   optval.subnet_config = subnet_cfg;
 }
 
