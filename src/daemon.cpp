@@ -83,24 +83,51 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
   std::copy(datagram.hw_addr.cbegin(),
             datagram.hw_addr.cbegin() + datagram.hwaddr_len,
             request_hwaddr.ether_addr_octet);
-  in_addr_t offer_address_host_order = INADDR_ANY;
-  if (!netconfig.fixed_hosts.contains(request_hwaddr)) {
-    offer_address_host_order = ntohl(netconfig.range_start.s_addr);
-    in_addr_t range_end_host_order = ntohl(netconfig.range_end.s_addr);
-    update_leases();
-    for (auto &entry : active_leases) {
-      if (offer_address_host_order == entry.first) {
-        offer_address_host_order++;
-      }
-      if (offer_address_host_order >= range_end_host_order) {
-        return;
-      } else {
-        break;
+  in_addr_t offer_address_host_order = datagram.client_ip;
+  in_addr_t net_start_host_order = ntohl(netconfig.range_start.s_addr);
+  in_addr_t net_end_host_order = ntohl(netconfig.range_end.s_addr);
+
+  // figure out what address we can give the client
+  update_leases();
+  if (datagram.options.contains(OptionTag::REQUESTED_IP_ADDRESS)) {
+    in_addr_t requested_ip = to_number<in_addr_t>(
+        datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS));
+    if (requested_ip >= net_start_host_order &&
+        requested_ip <= net_end_host_order) {
+      if (!active_leases.contains(requested_ip) ||
+          active_leases.at(requested_ip).first == datagram.hw_addr) {
+        offer_address_host_order = requested_ip;
       }
     }
-  } else {
-    offer_address_host_order =
-        ntohl(netconfig.fixed_hosts[request_hwaddr].s_addr);
+  } else if (offer_address_host_order != INADDR_ANY) {
+    // the client has not requested a specific lease, so we just return the
+    // remaining lease time
+    uint64_t now = get_current_time();
+    uint32_t until_rebind = static_cast<uint32_t>(
+        active_leases.at(offer_address_host_order).second - now);
+    uint32_t until_renew = static_cast<uint32_t>(
+        until_rebind - (netconfig.lease_time_seconds / 2));
+    reply.options[OptionTag::DHCP_RENEW_TIME] = to_byte_vector(until_renew);
+    reply.options[OptionTag::DHCP_REBINDING_TIME] =
+        to_byte_vector(until_rebind);
+  }
+  if (offer_address_host_order == INADDR_ANY) {
+    if (!netconfig.fixed_hosts.contains(request_hwaddr)) {
+      offer_address_host_order = net_start_host_order;
+      for (auto &entry : active_leases) {
+        if (offer_address_host_order == entry.first) {
+          offer_address_host_order++;
+        }
+        if (offer_address_host_order >= net_end_host_order) {
+          return;
+        } else {
+          break;
+        }
+      }
+    } else {
+      offer_address_host_order =
+          ntohl(netconfig.fixed_hosts[request_hwaddr].s_addr);
+    }
   }
   in_addr_t offer_address_netorder = htonl(offer_address_host_order);
 
@@ -108,7 +135,6 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
   reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_OFFER};
   reply.options[OptionTag::SERVER_IDENTIFIER] =
       to_byte_vector(datagram.recv_addr);
-  reply.server_ip = datagram.recv_addr;
 
   set_requested_options(datagram, reply);
 
@@ -120,7 +146,8 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
     .sin_family = AF_INET, .sin_port = htons(DHCP_CLIENT_PORT), .sin_addr = {},
     .sin_zero = {}
   };
-  if ((datagram.flags & 0x8000) != 0) {
+  if ((datagram.flags & 0x8000) !=
+      0) { // is the broadcast flag set or the hw address otherwise borked?
     struct ifreq ireq;
     std::memcpy(&ireq.ifr_name, datagram.recv_iface.c_str(),
                 datagram.recv_iface.length() + 1);
