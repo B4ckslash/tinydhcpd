@@ -4,9 +4,8 @@
 #include <libconfig.h++>
 #include <netinet/ether.h>
 
-#include <string>
-
-#include "utils.hpp"
+#include "bytemanip.hpp"
+#include "string-format.hpp"
 
 namespace tinydhcpd {
 void parse_configuration(ProgramConfiguration &optval) {
@@ -22,9 +21,7 @@ void parse_configuration(ProgramConfiguration &optval) {
         "One of (listen-address|interface) must be given!");
   }
 
-  if (!configuration.lookupValue(LEASE_FILE_KEY, optval.lease_file_path)) {
-    optval.lease_file_path = "/var/lib/tinydhcpd/leases";
-  }
+  configuration.lookupValue(LEASE_FILE_KEY, optval.lease_file_path);
 
   if (!config_listen_address.empty()) {
     inet_aton(config_listen_address.c_str(), &(optval.address));
@@ -59,11 +56,15 @@ void parse_configuration(ProgramConfiguration &optval) {
     parse_options(subnet_parsed_cfg, subnet_cfg);
   }
 
-  if (!subnet_parsed_cfg.lookupValue(LEASE_TIME_KEY,
-                                     subnet_cfg.lease_time_seconds)) {
-    subnet_cfg.lease_time_seconds = DEFAULT_LEASE_TIME;
-  }
+  // convert to host long because the bytes are sent as-is, but
+  // inet_aton puts them into network order (i.e. big endian)
+  subnet_cfg.defined_options[OptionTag::SUBNET_MASK] =
+      to_byte_vector(ntohl(subnet_cfg.netmask.s_addr));
 
+  uint32_t lease_time_seconds = DEFAULT_LEASE_TIME;
+  subnet_parsed_cfg.lookupValue(LEASE_TIME_KEY, lease_time_seconds);
+  subnet_cfg.defined_options[OptionTag::LEASE_TIME] =
+      to_byte_vector(lease_time_seconds);
   optval.subnet_config = subnet_cfg;
 }
 
@@ -122,7 +123,7 @@ void parse_hosts(libconfig::Setting &subnet_cfg_block,
         continue;
       }
 
-      subnet_cfg.fixed_hosts.push_back({*parsed_ether_addr, parsed_ip4_addr});
+      subnet_cfg.fixed_hosts[*parsed_ether_addr] = parsed_ip4_addr;
     }
   }
 }

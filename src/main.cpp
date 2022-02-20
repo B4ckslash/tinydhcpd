@@ -3,6 +3,7 @@
 #include <libconfig.h++>
 
 #include <csignal>
+#include <filesystem>
 #include <iostream>
 
 #include "configuration.hpp"
@@ -29,11 +30,12 @@ int main(int argc, char *const argv[]) {
   std::signal(SIGTERM, sighandler);
   std::signal(SIGHUP, sighandler);
 
-  tinydhcpd::ProgramConfiguration optval = {.address = {.s_addr = INADDR_ANY},
-                                            .interface = "",
-                                            .confpath =
-                                                "/etc/tinydhcpd/tinydhcpd.conf",
-                                            .subnet_config = {}};
+  tinydhcpd::ProgramConfiguration optval = {
+      .address = {.s_addr = INADDR_ANY},
+      .interface = "",
+      .confpath = "/etc/tinydhcpd/tinydhcpd.conf",
+      .lease_file_path = "/var/lib/tinydhcpd/leases",
+      .subnet_config = {}};
 
   int opt;
   while ((opt = getopt_long(argc, argv, "a:i:c:", long_options, nullptr)) !=
@@ -64,6 +66,13 @@ int main(int argc, char *const argv[]) {
   } catch (libconfig::ParseException &pex) {
     std::cerr << pex.getFile() << "|" << pex.getLine() << "|" << pex.getError()
               << std::endl;
+    exit(EXIT_FAILURE);
+  } catch (libconfig::FileIOException &fex) {
+    std::cerr << "Error reading file " << optval.confpath << ".";
+    if (!std::filesystem::exists(optval.confpath)) {
+      std::cerr << " The file does not exist.";
+    }
+    std::cerr << std::endl;
     exit(EXIT_FAILURE);
   }
 

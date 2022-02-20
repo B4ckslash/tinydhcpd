@@ -3,19 +3,14 @@
 #include <arpa/inet.h>
 #include <chrono>
 #include <cstddef>
-#include <cstdint>
-#include <cstdlib>
 #include <cstring>
-#include <fstream>
-#include <linux/if_packet.h>
+#include <net/if.h>
 #include <netinet/in.h>
-#include <string>
 #include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <utility>
 
+#include "bytemanip.hpp"
 #include "datagram.hpp"
-#include "utils.hpp"
+#include "string-format.hpp"
 
 namespace tinydhcpd {
 volatile std::sig_atomic_t last_signal;
@@ -84,12 +79,97 @@ void Daemon::handle_recv(DhcpDatagram &datagram) {
 void Daemon::handle_discovery(const DhcpDatagram &datagram) {
   DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
   std::cout << "DHCPDISCOVER" << std::endl;
+  struct ether_addr request_hwaddr {};
+  std::copy(datagram.hw_addr.cbegin(),
+            datagram.hw_addr.cbegin() + datagram.hwaddr_len,
+            request_hwaddr.ether_addr_octet);
+  in_addr_t offer_address_host_order = datagram.client_ip;
+  in_addr_t net_start_host_order = ntohl(netconfig.range_start.s_addr);
+  in_addr_t net_end_host_order = ntohl(netconfig.range_end.s_addr);
+
+  // figure out what address we can give the client
+  update_leases();
+  if (datagram.options.contains(OptionTag::REQUESTED_IP_ADDRESS)) {
+    in_addr_t requested_ip = to_number<in_addr_t>(
+        datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS));
+    if (requested_ip >= net_start_host_order &&
+        requested_ip <= net_end_host_order) {
+      if (!active_leases.contains(requested_ip) ||
+          active_leases.at(requested_ip).first == datagram.hw_addr) {
+        offer_address_host_order = requested_ip;
+      }
+    }
+  } else if (offer_address_host_order != INADDR_ANY) {
+    // the client has not requested a specific lease, so we just return the
+    // remaining lease time
+    uint64_t now = get_current_time();
+    uint32_t remaining = static_cast<uint32_t>(
+        active_leases.at(offer_address_host_order).second - now);
+    reply.options[OptionTag::LEASE_TIME] = to_byte_vector(remaining);
+  }
+  if (offer_address_host_order == INADDR_ANY) {
+    if (!netconfig.fixed_hosts.contains(request_hwaddr)) {
+      offer_address_host_order = net_start_host_order;
+      for (auto &entry : active_leases) {
+        if (offer_address_host_order == entry.first) {
+          offer_address_host_order++;
+        }
+        if (offer_address_host_order >= net_end_host_order) {
+          return;
+        } else {
+          break;
+        }
+      }
+    } else {
+      offer_address_host_order =
+          ntohl(netconfig.fixed_hosts[request_hwaddr].s_addr);
+    }
+  }
+  in_addr_t offer_address_netorder = htonl(offer_address_host_order);
+
+  reply.assigned_ip = offer_address_host_order;
+  reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_OFFER};
+  reply.options[OptionTag::SERVER_IDENTIFIER] =
+      to_byte_vector(datagram.recv_addr);
+
+  set_requested_options(datagram, reply);
+
+  const uint64_t current_time_seconds = get_current_time();
+  active_leases[offer_address_host_order] =
+      std::make_pair(datagram.hw_addr, current_time_seconds + 10);
+
+  struct sockaddr_in destination {
+    .sin_family = AF_INET, .sin_port = htons(DHCP_CLIENT_PORT), .sin_addr = {},
+    .sin_zero = {}
+  };
+  if ((datagram.flags & 0x8000) !=
+      0) { // is the broadcast flag set or the hw address otherwise borked?
+    struct ifreq ireq;
+    std::memcpy(&ireq.ifr_name, datagram.recv_iface.c_str(),
+                datagram.recv_iface.length() + 1);
+    if (ioctl(socket, SIOCGIFBRDADDR, &ireq) != 0) {
+      std::cerr << "Failed to get broadcast address! Falling back to manual "
+                   "calculation. Error: "
+                << errno << std::endl;
+      destination.sin_addr.s_addr =
+          (datagram.recv_addr | ~netconfig.netmask.s_addr);
+    } else {
+      destination.sin_addr.s_addr =
+          reinterpret_cast<struct sockaddr_in *>(&ireq.ifr_broadaddr)
+              ->sin_addr.s_addr;
+    }
+  } else {
+    destination.sin_addr.s_addr = offer_address_netorder;
+    inject_into_arp(destination, datagram);
+  }
+  socket.enqueue_datagram(destination, reply);
 }
 
 void Daemon::handle_request(const DhcpDatagram &datagram) {
-  DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
   in_addr_t requested_address_netorder = htonl(to_number<in_addr_t>(
       datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS)));
+  in_addr_t requested_address_hostorder = ntohl(requested_address_netorder);
+
   if ((requested_address_netorder & netconfig.netmask.s_addr) !=
       netconfig.subnet_address.s_addr) {
     std::cerr << "Requested address "
@@ -98,50 +178,47 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
     return;
   }
   update_leases();
-  if (!active_leases.contains(requested_address_netorder) ||
-      active_leases[requested_address_netorder].first == datagram.hw_addr) {
+  if (!active_leases.contains(requested_address_hostorder) ||
+      active_leases[requested_address_hostorder].first == datagram.hw_addr) {
+    DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
     reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_ACK};
-    reply.assigned_ip = ntohl(requested_address_netorder);
+    reply.assigned_ip = requested_address_hostorder;
 
-    auto renew_time_network_order_array =
-        to_byte_array(netconfig.lease_time_seconds / 2);
-    auto rebind_time_network_order_array =
-        to_byte_array(netconfig.lease_time_seconds);
-    reply.options[OptionTag::DHCP_RENEW_TIME] =
-        std::vector<uint8_t>(renew_time_network_order_array.begin(),
-                             renew_time_network_order_array.end());
-    reply.options[OptionTag::DHCP_REBINDING_TIME] =
-        std::vector<uint8_t>(rebind_time_network_order_array.begin(),
-                             rebind_time_network_order_array.end());
+    set_requested_options(datagram, reply);
 
     const uint64_t current_time_seconds = get_current_time();
-    active_leases[requested_address_netorder] = std::make_pair(
+    active_leases[requested_address_hostorder] = std::make_pair(
         datagram.hw_addr, current_time_seconds + netconfig.lease_time_seconds);
 
     struct sockaddr_in destination {
       .sin_family = AF_INET, .sin_port = htons(DHCP_CLIENT_PORT),
-      .sin_addr = {.s_addr = requested_address_netorder},
+      .sin_addr = {.s_addr = requested_address_netorder}, .sin_zero = {}
     };
 
-    struct sockaddr arp_hwaddr {
-      .sa_family = datagram.hwaddr_type, .sa_data = {}
-    };
-    std::copy(datagram.hw_addr.cbegin(),
-              datagram.hw_addr.cbegin() + datagram.hwaddr_len,
-              arp_hwaddr.sa_data);
-
-    struct arpreq areq {
-      .arp_pa = {}, .arp_ha = arp_hwaddr, .arp_flags = ATF_COM,
-      .arp_netmask = {}, .arp_dev = {}
-    };
-    std::memcpy(&areq.arp_pa, &destination, sizeof(struct sockaddr_in));
-    std::memcpy(&areq.arp_dev, datagram.recv_iface.c_str(),
-                datagram.recv_iface.length() + 1);
-    if (ioctl(socket, SIOCSARP, &areq) != 0)
-      std::cerr << "Failed to inject into arp cache!" << errno << std::endl;
+    inject_into_arp(destination, datagram);
 
     socket.enqueue_datagram(destination, reply);
   }
+}
+
+void Daemon::inject_into_arp(const struct sockaddr_in &destination,
+                             const DhcpDatagram &request_datagram) {
+  struct sockaddr arp_hwaddr {
+    .sa_family = request_datagram.hwaddr_type, .sa_data = {}
+  };
+  std::copy(request_datagram.hw_addr.cbegin(),
+            request_datagram.hw_addr.cbegin() + request_datagram.hwaddr_len,
+            arp_hwaddr.sa_data);
+
+  struct arpreq areq {
+    .arp_pa = {}, .arp_ha = arp_hwaddr, .arp_flags = ATF_COM, .arp_netmask = {},
+    .arp_dev = {}
+  };
+  std::memcpy(&areq.arp_pa, &destination, sizeof(struct sockaddr_in));
+  std::memcpy(&areq.arp_dev, request_datagram.recv_iface.c_str(),
+              request_datagram.recv_iface.length() + 1);
+  if (ioctl(socket, SIOCSARP, &areq) != 0)
+    std::cerr << "Failed to inject into arp cache!" << errno << std::endl;
 }
 
 DhcpDatagram
@@ -150,17 +227,45 @@ Daemon::create_skeleton_reply_datagram(const DhcpDatagram &request_datagram) {
                     .hwaddr_type = request_datagram.hwaddr_type,
                     .hwaddr_len = request_datagram.hwaddr_len,
                     .transaction_id = request_datagram.transaction_id,
-                    .server_ip = request_datagram.recv_addr};
+                    .secs_passed = 0x0,
+                    .flags = request_datagram.flags,
+                    .client_ip = INADDR_ANY,
+                    .assigned_ip = INADDR_ANY,
+                    .server_ip = INADDR_ANY,
+                    .relay_agent_ip = INADDR_ANY,
+                    .recv_addr = 0x0,
+                    .recv_iface = "",
+                    .hw_addr = {},
+                    .options =
+                        std::unordered_map<OptionTag, std::vector<uint8_t>>()};
   std::copy(request_datagram.hw_addr.begin(), request_datagram.hw_addr.end(),
             skel.hw_addr.begin());
   return skel;
 }
 
+void Daemon::set_requested_options(const DhcpDatagram &request,
+                                   DhcpDatagram &reply) {
+  if (!request.options.contains(OptionTag::PARAMETER_REQUEST_LIST)) {
+    return;
+  }
+  for (uint8_t option : request.options.at(OptionTag::PARAMETER_REQUEST_LIST)) {
+    if (!netconfig.defined_options.contains(static_cast<OptionTag>(option)) ||
+        reply.options.contains(static_cast<OptionTag>(option))) {
+      continue;
+    }
+    reply.options[static_cast<OptionTag>(option)] =
+        netconfig.defined_options.at(static_cast<OptionTag>(option));
+  }
+}
+
 void Daemon::update_leases() {
   const uint64_t current_time_seconds = get_current_time();
-  for (auto const &[inet_addr, val] : active_leases) {
-    if (val.second <= current_time_seconds) {
-      active_leases.erase(inet_addr);
+  for (auto map_iter = active_leases.cbegin();
+       map_iter != active_leases.cend();) {
+    if (map_iter->second.second <= current_time_seconds) {
+      map_iter = active_leases.erase(map_iter);
+    } else {
+      ++map_iter;
     }
   }
 }

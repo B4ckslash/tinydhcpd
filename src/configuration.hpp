@@ -25,7 +25,7 @@ const std::string HOSTS_FIXED_ADDRESS_KEY = "fixed-address";
 const std::string OPTIONS_ROUTER_KEY = "routers";
 const std::string OPTIONS_DNS_SERVERS_KEY = "domain-name-servers";
 
-constexpr uint32_t DEFAULT_LEASE_TIME = 24 * 60 * 60; // 24h in seconds
+constexpr uint32_t DEFAULT_LEASE_TIME = 3600; // 1h
 
 const std::map<std::string, OptionTag> key_tag_mapping = {
     {OPTIONS_ROUTER_KEY, OptionTag::ROUTERS},
