@@ -23,8 +23,8 @@ private:
   void load_leases();
   void update_leases();
   uint64_t get_current_time();
-  void inject_into_arp(const struct sockaddr_in &destination,
-                       const DhcpDatagram &request_datagram);
+  struct sockaddr_in get_reply_destination(const DhcpDatagram &request_datagram,
+                                           const in_addr_t unicast_address);
   void set_requested_options(const DhcpDatagram &request, DhcpDatagram &reply);
   void handle_discovery(const DhcpDatagram &datagram);
   void handle_request(const DhcpDatagram &datagram);

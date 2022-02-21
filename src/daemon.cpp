@@ -71,6 +71,8 @@ void Daemon::handle_recv(DhcpDatagram &datagram) {
     break;
   case DHCP_TYPE_INFORM:
     break;
+  case DHCP_TYPE_DECLINE:
+    break;
   default:
     break;
   }
@@ -138,30 +140,8 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
   active_leases[offer_address_host_order] =
       std::make_pair(datagram.hw_addr, current_time_seconds + 10);
 
-  struct sockaddr_in destination {
-    .sin_family = AF_INET, .sin_port = htons(DHCP_CLIENT_PORT), .sin_addr = {},
-    .sin_zero = {}
-  };
-  if ((datagram.flags & 0x8000) !=
-      0) { // is the broadcast flag set or the hw address otherwise borked?
-    struct ifreq ireq;
-    std::memcpy(&ireq.ifr_name, datagram.recv_iface.c_str(),
-                datagram.recv_iface.length() + 1);
-    if (ioctl(socket, SIOCGIFBRDADDR, &ireq) != 0) {
-      std::cerr << "Failed to get broadcast address! Falling back to manual "
-                   "calculation. Error: "
-                << errno << std::endl;
-      destination.sin_addr.s_addr =
-          (datagram.recv_addr | ~netconfig.netmask.s_addr);
-    } else {
-      destination.sin_addr.s_addr =
-          reinterpret_cast<struct sockaddr_in *>(&ireq.ifr_broadaddr)
-              ->sin_addr.s_addr;
-    }
-  } else {
-    destination.sin_addr.s_addr = offer_address_netorder;
-    inject_into_arp(destination, datagram);
-  }
+  struct sockaddr_in destination =
+      get_reply_destination(datagram, offer_address_netorder);
   socket.enqueue_datagram(destination, reply);
 }
 
@@ -190,35 +170,68 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
     active_leases[requested_address_hostorder] = std::make_pair(
         datagram.hw_addr, current_time_seconds + netconfig.lease_time_seconds);
 
-    struct sockaddr_in destination {
-      .sin_family = AF_INET, .sin_port = htons(DHCP_CLIENT_PORT),
-      .sin_addr = {.s_addr = requested_address_netorder}, .sin_zero = {}
-    };
-
-    inject_into_arp(destination, datagram);
+    struct sockaddr_in destination =
+        get_reply_destination(datagram, requested_address_netorder);
 
     socket.enqueue_datagram(destination, reply);
   }
 }
 
-void Daemon::inject_into_arp(const struct sockaddr_in &destination,
-                             const DhcpDatagram &request_datagram) {
-  struct sockaddr arp_hwaddr {
-    .sa_family = request_datagram.hwaddr_type, .sa_data = {}
+// Determines the reply destination based on the request datagram.
+// If the reply can be sent as unicast, this also injects the
+// unicast_address <-> hwaddr mapping into the ARP cache.
+struct sockaddr_in
+Daemon::get_reply_destination(const DhcpDatagram &request_datagram,
+                              const in_addr_t unicast_address) {
+  struct sockaddr_in destination {
+    .sin_family = AF_INET, .sin_port = htons(DHCP_CLIENT_PORT),
+    .sin_addr = {.s_addr = unicast_address}, .sin_zero = {}
   };
-  std::copy(request_datagram.hw_addr.cbegin(),
-            request_datagram.hw_addr.cbegin() + request_datagram.hwaddr_len,
-            arp_hwaddr.sa_data);
+  bool is_unicast = true;
 
-  struct arpreq areq {
-    .arp_pa = {}, .arp_ha = arp_hwaddr, .arp_flags = ATF_COM, .arp_netmask = {},
-    .arp_dev = {}
-  };
-  std::memcpy(&areq.arp_pa, &destination, sizeof(struct sockaddr_in));
-  std::memcpy(&areq.arp_dev, request_datagram.recv_iface.c_str(),
-              request_datagram.recv_iface.length() + 1);
-  if (ioctl(socket, SIOCSARP, &areq) != 0)
-    std::cerr << "Failed to inject into arp cache!" << errno << std::endl;
+  // is the broadcast flag set or the hw addr somehow not correct (e.g. all
+  // zeroes)?
+  if ((request_datagram.flags & 0x8000) != 0 ||
+      request_datagram.hwaddr_len == 0 ||
+      std::find_if(request_datagram.hw_addr.cbegin(),
+                   request_datagram.hw_addr.cend(), [](uint8_t byte) {
+                     return byte > 0;
+                   }) == request_datagram.hw_addr.cend()) {
+    is_unicast = false;
+    struct ifreq ireq;
+    std::memcpy(&ireq.ifr_name, request_datagram.recv_iface.c_str(),
+                request_datagram.recv_iface.length() + 1);
+    if (ioctl(socket, SIOCGIFBRDADDR, &ireq) != 0) {
+      std::cerr << "Failed to get broadcast address! Falling back to manual "
+                   "calculation. Error: "
+                << errno << std::endl;
+      destination.sin_addr.s_addr =
+          (request_datagram.recv_addr | ~netconfig.netmask.s_addr);
+    } else {
+      destination.sin_addr.s_addr =
+          reinterpret_cast<struct sockaddr_in *>(&ireq.ifr_broadaddr)
+              ->sin_addr.s_addr;
+    }
+  }
+  if (is_unicast) {
+    struct sockaddr arp_hwaddr {
+      .sa_family = request_datagram.hwaddr_type, .sa_data = {}
+    };
+    std::copy(request_datagram.hw_addr.cbegin(),
+              request_datagram.hw_addr.cbegin() + request_datagram.hwaddr_len,
+              arp_hwaddr.sa_data);
+
+    struct arpreq areq {
+      .arp_pa = {}, .arp_ha = arp_hwaddr, .arp_flags = ATF_COM,
+      .arp_netmask = {}, .arp_dev = {}
+    };
+    std::memcpy(&areq.arp_pa, &destination, sizeof(struct sockaddr_in));
+    std::memcpy(&areq.arp_dev, request_datagram.recv_iface.c_str(),
+                request_datagram.recv_iface.length() + 1);
+    if (ioctl(socket, SIOCSARP, &areq) != 0)
+      std::cerr << "Failed to inject into arp cache!" << errno << std::endl;
+  }
+  return destination;
 }
 
 DhcpDatagram
