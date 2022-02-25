@@ -31,8 +31,9 @@ public:
 
   void enqueue_datagram(struct sockaddr_in &destination,
                         DhcpDatagram &datagram);
-  void handle_epollin();
-  void handle_epollout();
+  bool has_waiting_messages();
+  bool handle_epollin();
+  bool handle_epollout();
 };
 
 } // namespace tinydhcpd

@@ -17,7 +17,7 @@ Socket::Socket(const struct in_addr &address, const std::string &iface_name,
                                          .sin_addr = address,
                                          .sin_zero = {}},
       server_ip(address.s_addr), send_queue() {
-  socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
+  socket_fd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
   if (socket_fd == -1) {
     die("Failed to create socket: ");
   }
@@ -65,7 +65,7 @@ void Socket::die(std::string error_msg) {
   throw std::runtime_error(error_msg.append(strerror(errno)));
 }
 
-void Socket::handle_epollin() {
+bool Socket::handle_epollin() {
   uint8_t raw_data_buffer[DGRAM_SIZE];
   uint8_t control_msg_buffer[256];
   struct iovec data_buffer {
@@ -78,7 +78,10 @@ void Socket::handle_epollin() {
   std::fill(raw_data_buffer, raw_data_buffer + DGRAM_SIZE, (uint8_t)0);
 
   if (recvmsg(socket_fd, &message_header, MSG_WAITALL) < 0) {
-    return;
+    if (errno == EWOULDBLOCK) {
+      return true;
+    }
+    return false;
   }
   try {
     DhcpDatagram datagram =
@@ -94,11 +97,12 @@ void Socket::handle_epollin() {
     std::cerr << ex.what() << std::endl;
   }
   std::fill(raw_data_buffer, raw_data_buffer + DGRAM_SIZE, (uint8_t)0);
+  return false;
 }
 
-void Socket::handle_epollout() {
+bool Socket::handle_epollout() {
   if (send_queue.empty()) {
-    return;
+    return false;
   }
 
   struct sockaddr_in destination = send_queue.front().first;
@@ -106,10 +110,17 @@ void Socket::handle_epollout() {
   if (sendto(socket_fd, data.data(), data.size(), MSG_DONTWAIT,
              reinterpret_cast<struct sockaddr *>(&destination),
              sizeof(destination)) == -1) {
-    std::cerr << "Send failed!" << std::endl;
+    if (errno == EWOULDBLOCK) {
+      return true;
+    } else {
+      std::cerr << "Send failed!" << std::endl;
+    }
   }
   send_queue.pop();
+  return false;
 }
+
+bool Socket::has_waiting_messages() { return send_queue.size() > 0; }
 
 std::pair<in_addr_t, std::string>
 Socket::extract_interface_info(struct msghdr &message_header) {

@@ -13,18 +13,19 @@ template <class T> class Epoll {
   static constexpr size_t MAX_EVENTS = 1;
 
   T &subject;
+  bool ready_to_send = false;
   int epoll_fd;
   struct epoll_event epoll_ctl_cfg;
   std::array<struct epoll_event, MAX_EVENTS> events;
 
 public:
   Epoll(T &subject, uint32_t events)
-      : subject(subject), epoll_ctl_cfg{.events = events, .data = {}},
+      : subject(subject), epoll_ctl_cfg{.events = events | EPOLLET, .data = {}},
         events() {
     epoll_fd = epoll_create1(0);
     if (epoll_fd == -1) {
       throw std::runtime_error("Failed to create epoll structure!");
-    }
+    };
     epoll_ctl_cfg.data.fd = subject;
 
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, subject, &epoll_ctl_cfg) == -1) {
@@ -61,6 +62,16 @@ public:
         return;
       }
 
+      if (ready_to_send) {
+        bool would_block = false;
+        while (subject.has_waiting_messages() && !would_block) {
+          would_block = subject.handle_epollout();
+        }
+        if (would_block) {
+          ready_to_send = false;
+        }
+      }
+
       if (epoll_wait(epoll_fd, events.data(), MAX_EVENTS, -1) == -1) {
         if (errno == EINTR) {
           continue;
@@ -68,10 +79,13 @@ public:
         throw std::runtime_error("epoll_wait failed");
       }
       if ((events[0].events & EPOLLIN) > 0) {
-        subject.handle_epollin();
+        bool finished = subject.handle_epollin();
+        while (!finished) {
+          finished = subject.handle_epollin();
+        }
       }
       if ((events[0].events & EPOLLOUT) > 0) {
-        subject.handle_epollout();
+        ready_to_send = true;
       }
     }
   }
