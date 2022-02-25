@@ -73,7 +73,16 @@ bool Socket::handle_epollin() {
   };
   struct msghdr message_header {
     .msg_name = nullptr, .msg_iov = &data_buffer, .msg_iovlen = 1,
-    .msg_control = &control_msg_buffer, .msg_controllen = 256
+#ifdef __MUSL__
+    // musl libc adheres more strictly to POSIX, which necessitates some padding
+    // Functionally this is the same as default initialization, but I don't like
+    // the compiler complaining if the field initializers are missing
+        .__pad1 = 0,
+#endif
+    .msg_control = &control_msg_buffer, .msg_controllen = 256,
+#ifdef __MUSL__
+    .__pad2 = 0,
+#endif
   };
   std::fill(raw_data_buffer, raw_data_buffer + DGRAM_SIZE, (uint8_t)0);
 
