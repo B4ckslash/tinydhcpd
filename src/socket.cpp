@@ -72,7 +72,8 @@ bool Socket::handle_epollin() {
     .iov_base = raw_data_buffer, .iov_len = DGRAM_SIZE
   };
   struct msghdr message_header {
-    .msg_name = nullptr, .msg_iov = &data_buffer, .msg_iovlen = 1,
+    .msg_name = nullptr, .msg_namelen = 0, .msg_iov = &data_buffer,
+    .msg_iovlen = 1,
 #ifdef __MUSL__
     // musl libc adheres more strictly to POSIX, which necessitates some padding
     // Functionally this is the same as default initialization, but I don't like
@@ -83,6 +84,7 @@ bool Socket::handle_epollin() {
 #ifdef __MUSL__
     .__pad2 = 0,
 #endif
+    .msg_flags = 0,
   };
   std::fill(raw_data_buffer, raw_data_buffer + DGRAM_SIZE, (uint8_t)0);
 
