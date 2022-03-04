@@ -36,6 +36,8 @@ public:
          SubnetConfiguration &netconfig, const std::string &lease_file_path);
   virtual ~Daemon() {}
   virtual void handle_recv(DhcpDatagram &datagram) override;
+  void main_loop();
+  void write_leases();
 };
 
 } // namespace tinydhcpd

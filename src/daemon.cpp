@@ -35,12 +35,20 @@ Daemon::Daemon(const struct in_addr &address, const std::string &iface_name,
       epoll_socket(socket, (EPOLLIN | EPOLLOUT)), netconfig(netconfig),
       lease_file(lease_file_path, std::fstream::in | std::fstream::out),
       active_leases() {
+  if (!lease_file.is_open()) {
+    std::cerr << "The lease file does not exist! Creating a new one..."
+              << std::endl;
+    lease_file =
+        std::fstream(lease_file_path, std::fstream::in | std::fstream::out |
+                                          std::fstream::trunc);
+  }
   load_leases();
-  epoll_socket.poll_loop();
 } catch (std::runtime_error &ex) {
   printf("%s\n", ex.what());
   exit(EXIT_FAILURE);
 }
+
+void Daemon::main_loop() { epoll_socket.poll_loop(); }
 
 void Daemon::handle_recv(DhcpDatagram &datagram) {
   std::cout << string_format("XID: %#010x", datagram.transaction_id)
@@ -286,8 +294,10 @@ void Daemon::update_leases() {
 void Daemon::load_leases() {
   std::string current_line;
   const uint64_t current_time_seconds = get_current_time();
+  std::cout << "Reading leases... at " << current_time_seconds << std::endl;
 
   while (std::getline(lease_file, current_line)) {
+    std::cout << current_line << std::endl;
     size_t first_delim_pos = current_line.find_first_of(LEASE_FILE_DELIMITER);
     size_t last_delim_pos = current_line.find_last_of(LEASE_FILE_DELIMITER);
 
@@ -297,29 +307,51 @@ void Daemon::load_leases() {
     }
 
     std::string hwaddr_string = current_line.substr(0, first_delim_pos);
-    std::string ipaddr_string =
-        current_line.substr(first_delim_pos + 1, last_delim_pos);
-    uint64_t timeout_timestamp = std::strtoull(
+    std::string ipaddr_string = current_line.substr(
+        first_delim_pos + 1, last_delim_pos - first_delim_pos - 1);
+    uint64_t timeout_timestamp = std::strtoul(
         current_line
             .substr(last_delim_pos + 1, current_line.size() - last_delim_pos)
             .c_str(),
         nullptr, 16);
 
+    std::cout << "IP: " << ipaddr_string << " | Ether: " << hwaddr_string
+              << " | Timestamp: " << timeout_timestamp << std::endl;
     if (timeout_timestamp < current_time_seconds) {
       continue;
     }
 
     std::array<uint8_t, 16> hwaddr;
     size_t index = 0;
-    while (size_t pos = hwaddr_string.find_first_of(":") != std::string::npos) {
-      hwaddr[index] =
+    size_t pos = 0;
+    while ((pos = hwaddr_string.find_first_of(':')) != std::string::npos) {
+      hwaddr.at(index) =
           std::strtol(hwaddr_string.substr(0, pos).c_str(), nullptr, 16);
+      hwaddr_string.erase(0, pos + 1); // account for delimiter length
+      index++;
     }
 
     struct in_addr ip_addr {};
     inet_aton(ipaddr_string.c_str(), &ip_addr);
-    active_leases[ip_addr.s_addr] = std::make_pair(hwaddr, timeout_timestamp);
+    active_leases[ntohl(ip_addr.s_addr)] =
+        std::make_pair(hwaddr, timeout_timestamp);
   }
+  lease_file.clear();
+}
+
+void Daemon::write_leases() {
+  lease_file.seekg(0);
+  struct in_addr ip_addr;
+  for (auto const &[ip, value_pair] : active_leases) {
+    for (const uint8_t &octet : value_pair.first) {
+      lease_file << string_format("%x", octet) << ":";
+    }
+    lease_file << LEASE_FILE_DELIMITER;
+    ip_addr.s_addr = ntohl(ip);
+    lease_file << inet_ntoa(ip_addr) << LEASE_FILE_DELIMITER
+               << value_pair.second << "\n";
+  }
+  lease_file.flush();
 }
 
 uint64_t Daemon::get_current_time() {

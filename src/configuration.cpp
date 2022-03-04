@@ -65,6 +65,7 @@ void parse_configuration(ProgramConfiguration &optval) {
   subnet_parsed_cfg.lookupValue(LEASE_TIME_KEY, lease_time_seconds);
   subnet_cfg.defined_options[OptionTag::LEASE_TIME] =
       to_byte_vector(lease_time_seconds);
+  subnet_cfg.lease_time_seconds = lease_time_seconds;
   optval.subnet_config = subnet_cfg;
 }
 
