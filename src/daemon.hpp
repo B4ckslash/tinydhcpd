@@ -1,8 +1,10 @@
 #pragma once
 
+#include <climits>
 #include <cstdint>
 #include <fstream>
 #include <netinet/in.h>
+#include <random>
 
 #include "epoll.hpp"
 #include "socket.hpp"
@@ -18,8 +20,10 @@ private:
   DhcpDatagram
   create_skeleton_reply_datagram(const DhcpDatagram &request_datagram);
   std::fstream lease_file;
-  std::map<in_addr_t, std::pair<std::array<uint8_t, 16>, uint64_t>>
+  std::map<std::array<uint8_t, 16>, std::pair<in_addr_t, uint64_t>>
       active_leases;
+  std::independent_bits_engine<std::default_random_engine, CHAR_BIT, uint8_t>
+      rand;
   void load_leases();
   void update_leases();
   uint64_t get_current_time();

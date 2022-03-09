@@ -109,8 +109,8 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
         datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS));
     if (requested_ip >= range_start_host_order &&
         requested_ip <= range_end_host_order) {
-      if (!active_leases.contains(requested_ip) ||
-          active_leases.at(requested_ip).first == datagram.hw_addr) {
+      if (active_leases.contains(datagram.hw_addr) &&
+          active_leases.at(datagram.hw_addr).first == requested_ip) {
         offer_address_host_order = requested_ip;
       }
     }
@@ -118,15 +118,15 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
     // the client has not requested a specific lease, so we just return the
     // remaining lease time
     uint64_t now = get_current_time();
-    uint32_t remaining = static_cast<uint32_t>(
-        active_leases.at(offer_address_host_order).second - now);
+    uint32_t remaining =
+        static_cast<uint32_t>(active_leases.at(datagram.hw_addr).second - now);
     reply.options[OptionTag::LEASE_TIME] = to_byte_vector(remaining);
   }
   if (offer_address_host_order == INADDR_ANY) {
     if (!netconfig.fixed_hosts.contains(request_hwaddr)) {
       offer_address_host_order = range_start_host_order;
       for (auto &entry : active_leases) {
-        if (offer_address_host_order == entry.first) {
+        if (offer_address_host_order == entry.second.first) {
           offer_address_host_order++;
         }
         if (offer_address_host_order >= range_end_host_order) {
@@ -154,8 +154,8 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
   }
 
   const uint64_t current_time_seconds = get_current_time();
-  active_leases[offer_address_host_order] =
-      std::make_pair(datagram.hw_addr, current_time_seconds + 10);
+  active_leases[datagram.hw_addr] =
+      std::make_pair(offer_address_host_order, current_time_seconds + 10);
 
   struct sockaddr_in destination =
       get_reply_destination(datagram, offer_address_netorder);
@@ -163,8 +163,13 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
 }
 
 void Daemon::handle_request(const DhcpDatagram &datagram) {
-  in_addr_t requested_address_hostorder = to_number<in_addr_t>(
-      datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS));
+  in_addr_t requested_address_hostorder;
+  if (datagram.options.contains(OptionTag::REQUESTED_IP_ADDRESS)) {
+    requested_address_hostorder = to_number<in_addr_t>(
+        datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS));
+  } else {
+    requested_address_hostorder = datagram.client_ip;
+  }
   in_addr_t requested_address_netorder = htonl(requested_address_hostorder);
 
   DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
@@ -179,8 +184,8 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
     return;
   }
   update_leases();
-  if (active_leases.contains(requested_address_hostorder)) {
-    if (active_leases[requested_address_hostorder].first == datagram.hw_addr) {
+  if (active_leases.contains(datagram.hw_addr)) {
+    if (active_leases[datagram.hw_addr].first == requested_address_hostorder) {
       reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_ACK};
       reply.assigned_ip = requested_address_hostorder;
 
@@ -193,8 +198,8 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
       }
 
       const uint64_t current_time_seconds = get_current_time();
-      active_leases[requested_address_hostorder] =
-          std::make_pair(datagram.hw_addr,
+      active_leases[datagram.hw_addr] =
+          std::make_pair(requested_address_hostorder,
                          current_time_seconds + netconfig.lease_time_seconds);
 
       struct sockaddr_in destination =
@@ -211,8 +216,7 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
 }
 
 void Daemon::handle_release(const DhcpDatagram &datagram) {
-  in_addr_t client_ip = datagram.client_ip;
-  active_leases.erase(ntohl(client_ip));
+  active_leases.erase(datagram.hw_addr);
 }
 
 void Daemon::handle_inform(const DhcpDatagram &datagram) {
@@ -227,8 +231,10 @@ void Daemon::handle_inform(const DhcpDatagram &datagram) {
 void Daemon::handle_decline(const DhcpDatagram &datagram) {
   in_addr_t declined_ip_hostorder = to_number<in_addr_t>(
       datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS));
-  active_leases[declined_ip_hostorder] =
-      std::make_pair(datagram.hw_addr, UINT64_MAX);
+  std::array<uint8_t, 16> dummy_hwaddr;
+  std::generate(dummy_hwaddr.begin(), dummy_hwaddr.end(), std::ref(rand));
+  active_leases[dummy_hwaddr] =
+      std::make_pair(declined_ip_hostorder, UINT64_MAX);
 }
 
 // Determines the reply destination based on the request datagram.
@@ -380,8 +386,8 @@ void Daemon::load_leases() {
 
     struct in_addr ip_addr {};
     inet_aton(ipaddr_string.c_str(), &ip_addr);
-    active_leases[ntohl(ip_addr.s_addr)] =
-        std::make_pair(hwaddr, timeout_timestamp);
+    active_leases[hwaddr] =
+        std::make_pair(ntohl(ip_addr.s_addr), timeout_timestamp);
   }
   lease_file.clear();
 }
@@ -389,12 +395,12 @@ void Daemon::load_leases() {
 void Daemon::write_leases() {
   lease_file.seekg(0);
   struct in_addr ip_addr;
-  for (auto const &[ip, value_pair] : active_leases) {
-    for (const uint8_t &octet : value_pair.first) {
+  for (auto const &[hwaddr, value_pair] : active_leases) {
+    for (const uint8_t &octet : hwaddr) {
       lease_file << string_format("%x", octet) << ":";
     }
     lease_file << LEASE_FILE_DELIMITER;
-    ip_addr.s_addr = ntohl(ip);
+    ip_addr.s_addr = htonl(value_pair.first);
     lease_file << inet_ntoa(ip_addr) << LEASE_FILE_DELIMITER
                << value_pair.second << "\n";
   }
