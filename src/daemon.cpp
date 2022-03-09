@@ -94,7 +94,6 @@ void Daemon::handle_recv(DhcpDatagram &datagram) {
 
 void Daemon::handle_discovery(const DhcpDatagram &datagram) {
   DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
-  std::cout << "DHCPDISCOVER" << std::endl;
   struct ether_addr request_hwaddr {};
   std::copy(datagram.hw_addr.cbegin(),
             datagram.hw_addr.cbegin() + datagram.hwaddr_len,
@@ -186,6 +185,12 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
       reply.assigned_ip = requested_address_hostorder;
 
       set_requested_options(datagram, reply);
+      reply.options[OptionTag::SERVER_IDENTIFIER] =
+          to_byte_vector(datagram.recv_addr);
+      if (!reply.options.contains(OptionTag::LEASE_TIME)) {
+        reply.options[OptionTag::LEASE_TIME] =
+            to_byte_vector(netconfig.lease_time_seconds);
+      }
 
       const uint64_t current_time_seconds = get_current_time();
       active_leases[requested_address_hostorder] =
