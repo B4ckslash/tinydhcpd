@@ -360,7 +360,7 @@ void Daemon::load_leases() {
         current_line
             .substr(last_delim_pos + 1, current_line.size() - last_delim_pos)
             .c_str(),
-        nullptr, 16);
+        nullptr, 10);
 
     std::cout << "IP: " << ipaddr_string << " | Ether: " << hwaddr_string
               << " | Timestamp: " << timeout_timestamp << std::endl;
