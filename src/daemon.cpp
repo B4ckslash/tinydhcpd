@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -72,17 +73,22 @@ void Daemon::handle_recv(DhcpDatagram &datagram) {
     handle_discovery(datagram);
     break;
   case DHCP_TYPE_REQUEST:
-    std::cout << "DHCPREQUEST" << std::endl;
     handle_request(datagram);
     break;
   case DHCP_TYPE_RELEASE:
+    handle_release(datagram);
     break;
   case DHCP_TYPE_INFORM:
+    handle_inform(datagram);
     break;
   case DHCP_TYPE_DECLINE:
+    handle_decline(datagram);
     break;
   default:
-    break;
+    std::cerr << string_format(
+                     "Invalid message type: %x",
+                     datagram.options[OptionTag::DHCP_MESSAGE_TYPE].at(0))
+              << std::endl;
   }
 }
 
@@ -143,6 +149,10 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
       to_byte_vector(datagram.recv_addr);
 
   set_requested_options(datagram, reply);
+  if (!reply.options.contains(OptionTag::LEASE_TIME)) {
+    reply.options[OptionTag::LEASE_TIME] =
+        to_byte_vector(netconfig.lease_time_seconds);
+  }
 
   const uint64_t current_time_seconds = get_current_time();
   active_leases[offer_address_host_order] =
@@ -154,9 +164,9 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
 }
 
 void Daemon::handle_request(const DhcpDatagram &datagram) {
-  in_addr_t requested_address_netorder = htonl(to_number<in_addr_t>(
-      datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS)));
-  in_addr_t requested_address_hostorder = ntohl(requested_address_netorder);
+  in_addr_t requested_address_hostorder = to_number<in_addr_t>(
+      datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS));
+  in_addr_t requested_address_netorder = htonl(requested_address_hostorder);
 
   DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
   if ((requested_address_netorder & netconfig.netmask.s_addr) !=
@@ -193,6 +203,27 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
       socket.enqueue_datagram(dest, reply);
     }
   }
+}
+
+void Daemon::handle_release(const DhcpDatagram &datagram) {
+  in_addr_t client_ip = datagram.client_ip;
+  active_leases.erase(ntohl(client_ip));
+}
+
+void Daemon::handle_inform(const DhcpDatagram &datagram) {
+  DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
+  set_requested_options(datagram, reply);
+  reply.options.erase(OptionTag::LEASE_TIME);
+  struct sockaddr_in destination =
+      get_reply_destination(datagram, datagram.client_ip);
+  socket.enqueue_datagram(destination, reply);
+}
+
+void Daemon::handle_decline(const DhcpDatagram &datagram) {
+  in_addr_t declined_ip_hostorder = to_number<in_addr_t>(
+      datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS));
+  active_leases[declined_ip_hostorder] =
+      std::make_pair(datagram.hw_addr, UINT64_MAX);
 }
 
 // Determines the reply destination based on the request datagram.

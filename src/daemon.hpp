@@ -28,6 +28,7 @@ private:
   void set_requested_options(const DhcpDatagram &request, DhcpDatagram &reply);
   void handle_discovery(const DhcpDatagram &datagram);
   void handle_request(const DhcpDatagram &datagram);
+  void handle_decline(const DhcpDatagram &datagram);
   void handle_release(const DhcpDatagram &datagram);
   void handle_inform(const DhcpDatagram &datagram);
 
