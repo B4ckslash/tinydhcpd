@@ -43,12 +43,9 @@ DhcpDatagram DhcpDatagram::from_buffer(uint8_t *buffer, size_t buflen) {
       convert_network_byte_array_to_uint16(buffer + SECS_PASSED_OFFSET);
   datagram.flags = to_number<uint16_t>(buffer + FLAGS_OFFSET);
 
-  datagram.client_ip =
-      convert_network_byte_array_to_uint32(buffer + CLIENT_IP_OFFSET);
-  datagram.assigned_ip =
-      convert_network_byte_array_to_uint32(buffer + ASSIGNED_IP_OFFSET);
-  datagram.server_ip =
-      convert_network_byte_array_to_uint32(buffer + SERVER_IP_OFFSET);
+  datagram.client_ip = to_number<uint32_t>(buffer + CLIENT_IP_OFFSET);
+  datagram.assigned_ip = to_number<uint32_t>(buffer + ASSIGNED_IP_OFFSET);
+  datagram.server_ip = to_number<uint32_t>(buffer + SERVER_IP_OFFSET);
 
   std::copy(buffer + CLIENT_HWADDR_OFFSET, buffer + SERVER_HOSTNAME_OFFSET - 1,
             datagram.hw_addr.begin());
