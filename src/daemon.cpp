@@ -94,16 +94,16 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
             datagram.hw_addr.cbegin() + datagram.hwaddr_len,
             request_hwaddr.ether_addr_octet);
   in_addr_t offer_address_host_order = datagram.client_ip;
-  in_addr_t net_start_host_order = ntohl(netconfig.range_start.s_addr);
-  in_addr_t net_end_host_order = ntohl(netconfig.range_end.s_addr);
+  in_addr_t range_start_host_order = ntohl(netconfig.range_start.s_addr);
+  in_addr_t range_end_host_order = ntohl(netconfig.range_end.s_addr);
 
   // figure out what address we can give the client
   update_leases();
   if (datagram.options.contains(OptionTag::REQUESTED_IP_ADDRESS)) {
     in_addr_t requested_ip = to_number<in_addr_t>(
         datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS));
-    if (requested_ip >= net_start_host_order &&
-        requested_ip <= net_end_host_order) {
+    if (requested_ip >= range_start_host_order &&
+        requested_ip <= range_end_host_order) {
       if (!active_leases.contains(requested_ip) ||
           active_leases.at(requested_ip).first == datagram.hw_addr) {
         offer_address_host_order = requested_ip;
@@ -119,12 +119,12 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
   }
   if (offer_address_host_order == INADDR_ANY) {
     if (!netconfig.fixed_hosts.contains(request_hwaddr)) {
-      offer_address_host_order = net_start_host_order;
+      offer_address_host_order = range_start_host_order;
       for (auto &entry : active_leases) {
         if (offer_address_host_order == entry.first) {
           offer_address_host_order++;
         }
-        if (offer_address_host_order >= net_end_host_order) {
+        if (offer_address_host_order >= range_end_host_order) {
           return;
         } else {
           break;
@@ -158,30 +158,40 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
       datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS)));
   in_addr_t requested_address_hostorder = ntohl(requested_address_netorder);
 
+  DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
   if ((requested_address_netorder & netconfig.netmask.s_addr) !=
       netconfig.subnet_address.s_addr) {
     std::cerr << "Requested address "
               << inet_ntoa(in_addr{.s_addr = requested_address_netorder})
-              << " is not in range!" << std::endl;
+              << " is not in the configured subnet!" << std::endl;
+    reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_NAK};
+    struct sockaddr_in dest = get_reply_destination(datagram, INADDR_ANY);
+    socket.enqueue_datagram(dest, reply);
     return;
   }
   update_leases();
-  if (!active_leases.contains(requested_address_hostorder) ||
-      active_leases[requested_address_hostorder].first == datagram.hw_addr) {
-    DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
-    reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_ACK};
-    reply.assigned_ip = requested_address_hostorder;
+  if (active_leases.contains(requested_address_hostorder)) {
+    if (active_leases[requested_address_hostorder].first == datagram.hw_addr) {
+      reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_ACK};
+      reply.assigned_ip = requested_address_hostorder;
 
-    set_requested_options(datagram, reply);
+      set_requested_options(datagram, reply);
 
-    const uint64_t current_time_seconds = get_current_time();
-    active_leases[requested_address_hostorder] = std::make_pair(
-        datagram.hw_addr, current_time_seconds + netconfig.lease_time_seconds);
+      const uint64_t current_time_seconds = get_current_time();
+      active_leases[requested_address_hostorder] =
+          std::make_pair(datagram.hw_addr,
+                         current_time_seconds + netconfig.lease_time_seconds);
 
-    struct sockaddr_in destination =
-        get_reply_destination(datagram, requested_address_netorder);
+      struct sockaddr_in destination =
+          get_reply_destination(datagram, requested_address_netorder);
 
-    socket.enqueue_datagram(destination, reply);
+      socket.enqueue_datagram(destination, reply);
+    } else {
+      // if somebody else holds this lease, we tell the client to reset
+      reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_NAK};
+      struct sockaddr_in dest = get_reply_destination(datagram, INADDR_ANY);
+      socket.enqueue_datagram(dest, reply);
+    }
   }
 }
 
@@ -202,9 +212,10 @@ Daemon::get_reply_destination(const DhcpDatagram &request_datagram,
   if ((request_datagram.flags & 0x8000) != 0 ||
       request_datagram.hwaddr_len == 0 ||
       std::find_if(request_datagram.hw_addr.cbegin(),
-                   request_datagram.hw_addr.cend(), [](uint8_t byte) {
-                     return byte > 0;
-                   }) == request_datagram.hw_addr.cend()) {
+                   request_datagram.hw_addr.cend(),
+                   [](uint8_t byte) { return byte > 0; }) ==
+          request_datagram.hw_addr.cend() ||
+      unicast_address == INADDR_ANY) {
     is_unicast = false;
     struct ifreq ireq;
     std::memcpy(&ireq.ifr_name, request_datagram.recv_iface.c_str(),
