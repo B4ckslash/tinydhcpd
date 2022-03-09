@@ -232,7 +232,7 @@ void Daemon::handle_decline(const DhcpDatagram &datagram) {
   in_addr_t declined_ip_hostorder = to_number<in_addr_t>(
       datagram.options.at(OptionTag::REQUESTED_IP_ADDRESS));
   std::array<uint8_t, 16> dummy_hwaddr;
-  std::generate(dummy_hwaddr.begin(), dummy_hwaddr.end(), std::ref(rand));
+  std::fill(dummy_hwaddr.begin(), dummy_hwaddr.end(), 0x0);
   active_leases[dummy_hwaddr] =
       std::make_pair(declined_ip_hostorder, UINT64_MAX);
 }
