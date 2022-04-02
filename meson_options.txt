@@ -1,0 +1,1 @@
+option('use_systemd', type: 'boolean', value: true, description: 'Compile systemd features' )

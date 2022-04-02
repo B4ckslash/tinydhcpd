@@ -1,7 +1,9 @@
 project('tinydhcpd', 'cpp', 
-    default_options : ['cpp_std=c++20', 'b_lto=true'])
+    default_options : ['cpp_std=c++20', 'b_lto=true'],
+    version: '0.0.1')
 
 args = ['-Wall', '-Wextra', '-Werror=return-type']
+dependencies = [dependency('libconfig++')]
 
 if meson.is_cross_build()
   libc_type = meson.get_external_property('libc', 'glibc')
@@ -16,7 +18,10 @@ else
   endif
 endif
 
-libconfig_dependency = dependency('libconfig++')
+if get_option('use_systemd')
+  dependencies += dependency('libsystemd')
+endif
+
 executable('tinydhcpd', 'src/main.cpp', 'src/daemon.cpp', 'src/socket.cpp', 'src/datagram.cpp', 'src/configuration.cpp', 'src/bytemanip.cpp',
     cpp_args: args,
-    dependencies: [libconfig_dependency])
+    dependencies: dependencies)
