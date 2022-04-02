@@ -6,8 +6,8 @@ args = ['-Wall', '-Wextra', '-Werror=return-type']
 dependencies = [dependency('libconfig++')]
 
 if meson.is_cross_build()
-  libc_type = meson.get_external_property('libc', 'glibc')
-  if libc_type == 'musl' or libc_type == 'MUSL'
+  libc_type = meson.get_external_property('libc', 'glibc').to_lower()
+  if libc_type == 'musl' or libc_type == 'musl-libc'
     args += '-D__MUSL__'
   endif
 else
