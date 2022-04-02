@@ -10,6 +10,10 @@
 #include "daemon.hpp"
 #include "socket.hpp"
 
+#ifdef HAVE_SYSTEMD
+#include "systemd_logger.hpp"
+#endif
+
 const char ADDRESS_OPTION_TAG = 'a';
 const char IFACE_OPTION_TAG = 'i';
 const char CONFIG_FILE_OPTION_TAG = 'c';
@@ -21,7 +25,7 @@ const struct option long_options[] = {
     {nullptr, 0, nullptr, 0}};
 
 void sighandler(int signum) {
-  std::cout << "Caught signal " << signum << std::endl;
+  LOG_TRACE("Caught signal " + std::to_string(signum));
   tinydhcpd::last_signal = signum;
 }
 
@@ -42,17 +46,17 @@ int main(int argc, char *const argv[]) {
          -1) {
     switch (opt) {
     case ADDRESS_OPTION_TAG:
-      std::cout << "Using address: " << optarg << std::endl;
+      LOG_DEBUG(std::string("Address from cmdline: ").append(optarg));
       inet_aton(optarg, &(optval.address));
       break;
 
     case IFACE_OPTION_TAG:
-      std::cout << "Using iface: " << optarg << std::endl;
+      LOG_DEBUG(std::string("Interface from cmdline: ").append(optarg));
       optval.interface = optarg;
       break;
 
     case CONFIG_FILE_OPTION_TAG:
-      std::cout << "Config file: " << optarg << std::endl;
+      LOG_DEBUG(std::string("Using config file: ").append(optarg));
       optval.confpath = optarg;
       break;
 

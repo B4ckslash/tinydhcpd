@@ -20,8 +20,9 @@ endif
 
 if get_option('use_systemd')
   dependencies += dependency('libsystemd')
+  args += '-DHAVE_SYSTEMD'
 endif
 
-executable('tinydhcpd', 'src/main.cpp', 'src/daemon.cpp', 'src/socket.cpp', 'src/datagram.cpp', 'src/configuration.cpp', 'src/bytemanip.cpp',
+executable('tinydhcpd', 'src/main.cpp', 'src/daemon.cpp', 'src/socket.cpp', 'src/datagram.cpp', 'src/configuration.cpp', 'src/bytemanip.cpp', 'src/logger.cpp',
     cpp_args: args,
     dependencies: dependencies)
