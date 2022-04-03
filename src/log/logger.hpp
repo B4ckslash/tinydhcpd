@@ -29,7 +29,6 @@
 namespace tinydhcpd {
 
 extern std::unique_ptr<LogSink> global_sink;
-Level current_log_level = Level::INFO;
 
 class Logger {
 private:

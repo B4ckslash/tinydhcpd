@@ -19,10 +19,14 @@ else
 endif
 
 if get_option('use_systemd')
-  dependencies += dependency('libsystemd')
-  args += '-DHAVE_SYSTEMD'
+  libsystemd_dep = dependency('libsystemd', required: false, 
+    not_found_message: 'Option use_systemd is set to true, but libsystemd was not found on this system. Perhaps you meant to configure with \'-Duse_systemd=false?\'')
+  if libsystemd_dep.found()
+    args += '-DHAVE_SYSTEMD'
+    dependencies += libsystemd_dep
+  endif
 endif
 
-executable('tinydhcpd', 'src/main.cpp', 'src/daemon.cpp', 'src/socket.cpp', 'src/datagram.cpp', 'src/configuration.cpp', 'src/bytemanip.cpp', 'src/logger.cpp',
+executable('tinydhcpd', 'src/main.cpp', 'src/daemon.cpp', 'src/socket.cpp', 'src/datagram.cpp', 'src/configuration.cpp', 'src/bytemanip.cpp', 'src/log/logger.cpp',
     cpp_args: args,
     dependencies: dependencies)

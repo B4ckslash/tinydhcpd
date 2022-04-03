@@ -1,11 +1,13 @@
 #include "logger.hpp"
 
 namespace tinydhcpd {
+Level current_global_log_level = Level::TRACE;
+
 Logger::Logger(const LogSink &sink, const Level level)
     : lvl(level), sink(sink) {}
 
 void Logger::operator()(const std::string &message) {
-  if (static_cast<int>(lvl) < current_log_level)
+  if (static_cast<int>(lvl) < current_global_log_level)
     return;
   sink.write(message, lvl);
 }

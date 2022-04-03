@@ -1,3 +1,4 @@
+#pragma once
 #include "logsink.hpp"
 #include <systemd/sd-daemon.h>
 

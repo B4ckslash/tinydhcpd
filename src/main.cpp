@@ -8,12 +8,12 @@
 
 #include "configuration.hpp"
 #include "daemon.hpp"
-#include "logger.hpp"
+#include "log/logger.hpp"
 #include "socket.hpp"
 #include "string-format.hpp"
 
 #ifdef HAVE_SYSTEMD
-#include "systemd_logsink.hpp"
+#include "log/systemd_logsink.hpp"
 #endif
 
 std::unique_ptr<tinydhcpd::LogSink> tinydhcpd::global_sink;
