@@ -16,6 +16,10 @@
 #include "log/systemd_logsink.hpp"
 #endif
 
+#ifndef PROGRAM_VERSION
+#define PROGRAM_VERSION "debug"
+#endif
+
 std::unique_ptr<tinydhcpd::LogSink> tinydhcpd::global_sink;
 
 const char ADDRESS_TAG = 'a';
@@ -39,6 +43,9 @@ int main(int argc, char *const argv[]) {
   std::signal(SIGHUP, sighandler);
 
   tinydhcpd::global_sink.reset(new tinydhcpd::SystemdLogSink(std::cerr));
+
+  LOG_INFO(
+      tinydhcpd::string_format("tinydhcpd %s starting...", PROGRAM_VERSION));
 
   tinydhcpd::ProgramConfiguration optval = {
       .address = {.s_addr = INADDR_ANY},

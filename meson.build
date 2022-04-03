@@ -2,7 +2,7 @@ project('tinydhcpd', 'cpp',
     default_options : ['cpp_std=c++20', 'b_lto=true'],
     version: '0.0.1')
 
-args = ['-Wall', '-Wextra', '-Werror=return-type']
+args = ['-Wall', '-Wextra', '-Werror=return-type', '-DPROGRAM_VERSION="@0@"'.format(meson.project_version())]
 dependencies = [dependency('libconfig++')]
 
 if meson.is_cross_build()
