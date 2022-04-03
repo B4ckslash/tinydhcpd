@@ -5,12 +5,8 @@ Logger::Logger(const LogSink &sink, const Level level)
     : lvl(level), sink(sink) {}
 
 void Logger::operator()(const std::string &message) {
+  if (static_cast<int>(lvl) < current_log_level)
+    return;
   sink.write(message, lvl);
-}
-
-LogSink::LogSink(std::ostream &sink) : sink(sink) {}
-
-void LogSink::write(const std::string &msg, Level level) const {
-  sink << format_message(msg, level) << std::endl;
 }
 } // namespace tinydhcpd
