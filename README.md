@@ -48,4 +48,4 @@ The inability to properly cross-compile and/or use the above programs strictly f
 - Implement a standards-conform DHCP server
 - Allow for easy cross-compilation
 - Explicitly support smaller/alternative libc implementations (like musl-libc)
-- Ideally minimize executable size (as of Dec 2021, the size-optimized stripped binary clocks in at just 36K)
+- Ideally minimize executable size (as of Apr 2022, the size-optimized stripped binary clocks in at just 64K)
