@@ -2,36 +2,36 @@
 
 #include "logsink.hpp"
 #include <memory>
+#include <sstream>
 
 #define LOG(Logger_, Message_, Level_)                                         \
   Logger_(static_cast<std::ostringstream &>(std::ostringstream().flush()       \
                                             << Message_)                       \
               .str(),                                                          \
           Level_)
-#ifndef LOG_TRACE
+#ifdef ENABLE_TRACE
 #define LOG_TRACE(Message_)                                                    \
   LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::TRACE)
+#else
+#define LOG_TRACE(Message_)                                                    \
+  do {                                                                         \
+  } while (0)
 #endif
-#ifndef LOG_DEBUG
+
 #define LOG_DEBUG(Message_)                                                    \
   LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::DEBUG)
-#endif
-#ifndef LOG_INFO
+
 #define LOG_INFO(Message_)                                                     \
   LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::INFO)
-#endif
-#ifndef LOG_WARN
+
 #define LOG_WARN(Message_)                                                     \
   LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::WARN)
-#endif
-#ifndef LOG_ERROR
+
 #define LOG_ERROR(Message_)                                                    \
   LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::ERROR)
-#endif
-#ifndef LOG_FATAL
+
 #define LOG_FATAL(Message_)                                                    \
   LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::FATAL)
-#endif
 
 namespace tinydhcpd {
 

@@ -5,6 +5,7 @@
 #include <netinet/ether.h>
 
 #include "bytemanip.hpp"
+#include "log/logger.hpp"
 #include "string-format.hpp"
 
 namespace tinydhcpd {
@@ -12,7 +13,9 @@ void parse_configuration(ProgramConfiguration &optval) {
   using ::libconfig::Setting, ::libconfig::Config;
   Config configuration;
 
+  LOG_INFO("Reading config file");
   configuration.readFile(optval.confpath);
+  LOG_TRACE("Parsing configuration...");
 
   std::string config_listen_address;
   if (!configuration.lookupValue(LISTEN_ADDRESS_KEY, config_listen_address) &&
@@ -72,7 +75,6 @@ void parse_configuration(ProgramConfiguration &optval) {
 void check_net_range(SubnetConfiguration &cfg) {
   in_addr_t netmasked_network_address =
       cfg.subnet_address.s_addr & cfg.netmask.s_addr;
-  // TODO fix logging
   if ((cfg.range_start.s_addr & cfg.netmask.s_addr) !=
       netmasked_network_address) {
     throw std::invalid_argument(string_format(
@@ -108,19 +110,19 @@ void parse_hosts(libconfig::Setting &subnet_cfg_block,
           subnet_cfg.subnet_address.s_addr & subnet_cfg.netmask.s_addr;
 
       if (parsed_ether_addr == nullptr) {
-        std::cerr << "Invalid MAC address in hosts list: " << config_ether_addr
-                  << std::endl;
+        LOG_WARN(std::string("Invalid MAC address in hosts list: ")
+                     .append(config_ether_addr));
         continue;
       }
       if (inet_aton(config_fixed_address.c_str(), &parsed_ip4_addr) == 0) {
-        std::cerr << "Invalid fixed address in hosts list: "
-                  << config_fixed_address << std::endl;
+        LOG_WARN(std::string("Invalid fixed address in hosts list: ")
+                     .append(config_fixed_address));
         continue;
       }
       if ((parsed_ip4_addr.s_addr & subnet_cfg.netmask.s_addr) !=
           netmasked_subnet_address) {
-        std::cerr << "Address is not in subnet: " << config_fixed_address
-                  << std::endl;
+        LOG_WARN(std::string("Address is not in subnet: ")
+                     .append(config_fixed_address));
         continue;
       }
 
@@ -142,11 +144,19 @@ void parse_options(libconfig::Setting &subnet_cfg_block,
     try {
       OptionTag tag = key_tag_mapping.at(option_key);
       switch (valueType) {
+
       case libconfig::Setting::Type::TypeInt: {
         int config_value = current_setting;
         auto netarray = to_network_byte_array((uint16_t)config_value);
         std::vector<uint8_t> value(netarray.begin(), netarray.end());
         subnet_cfg.defined_options[tag] = value;
+        std::ostringstream os;
+        os << "Read option " << string_format("%x", static_cast<uint8_t>(tag))
+           << " | Value: ";
+        for (auto &elem : value) {
+          os << string_format("%x ", elem);
+        }
+        LOG_TRACE(os.str());
         break;
       }
 
@@ -160,6 +170,13 @@ void parse_options(libconfig::Setting &subnet_cfg_block,
                            address_bytes.end());
         }
         subnet_cfg.defined_options[tag] = addresses;
+        std::ostringstream os;
+        os << "Read option " << string_format("%x", static_cast<uint8_t>(tag))
+           << " | Value: ";
+        for (auto &elem : addresses) {
+          os << string_format("%d ", elem);
+        }
+        LOG_TRACE(os.str());
         break;
       }
 
@@ -169,10 +186,17 @@ void parse_options(libconfig::Setting &subnet_cfg_block,
         std::vector<uint8_t> address(address_bytes.begin(),
                                      address_bytes.end());
         subnet_cfg.defined_options[tag] = address;
+        std::ostringstream os;
+        os << "Read option " << string_format("%x", static_cast<uint8_t>(tag))
+           << " | Value: ";
+        for (auto &elem : address) {
+          os << string_format("%d ", elem);
+        }
+        LOG_TRACE(os.str());
         break;
       }
     } catch (std::out_of_range &oor) {
-      std::cerr << "Unknown option: " << option_key << std::endl;
+      LOG_WARN(std::string("Unknown option: ").append(option_key));
       continue;
     }
   }

@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include "bytemanip.hpp"
+#include "log/logger.hpp"
 
 #define DGRAM_SIZE 576
 
@@ -62,7 +63,8 @@ Socket::~Socket() noexcept { close(socket_fd); }
 Socket::operator int() { return socket_fd; }
 
 void Socket::die(std::string error_msg) {
-  throw std::runtime_error(error_msg.append(strerror(errno)));
+  LOG_FATAL(error_msg.append(strerror(errno)));
+  throw std::runtime_error("");
 }
 
 bool Socket::handle_epollin() {
@@ -105,7 +107,7 @@ bool Socket::handle_epollin() {
     datagram.recv_iface = iface_info.second;
     observer.handle_recv(datagram);
   } catch (std::invalid_argument &ex) {
-    std::cerr << ex.what() << std::endl;
+    LOG_ERROR(ex.what());
   }
   std::fill(raw_data_buffer, raw_data_buffer + DGRAM_SIZE, (uint8_t)0);
   return false;
@@ -124,7 +126,7 @@ bool Socket::handle_epollout() {
     if (errno == EWOULDBLOCK) {
       return true;
     } else {
-      std::cerr << "Send failed!" << std::endl;
+      LOG_ERROR("Send failed!");
     }
   }
   send_queue.pop();
@@ -157,7 +159,7 @@ Socket::extract_interface_info(struct msghdr &message_header) {
                   ->sin_addr.s_addr),
         iface_name);
   }
-  die("No control message with packet info! ");
+  die("No control message with packet info!");
 }
 
 void Socket::enqueue_datagram(struct sockaddr_in &destination,

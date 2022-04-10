@@ -5,6 +5,7 @@
 #include <csignal>
 #include <filesystem>
 #include <iostream>
+#include <stdexcept>
 
 #include "configuration.hpp"
 #include "daemon.hpp"
@@ -64,17 +65,17 @@ int main(int argc, char *const argv[]) {
          -1) {
     switch (opt) {
     case ADDRESS_TAG:
-      LOG_DEBUG(std::string("Address from cmdline: ").append(optarg));
+      LOG_INFO(std::string("Address from cmdline: ").append(optarg));
       inet_aton(optarg, &(optval.address));
       break;
 
     case IFACE_TAG:
-      LOG_DEBUG(std::string("Interface from cmdline: ").append(optarg));
+      LOG_INFO(std::string("Interface from cmdline: ").append(optarg));
       optval.interface = optarg;
       break;
 
     case CONFIG_FILE_TAG:
-      LOG_DEBUG(std::string("Using config file: ").append(optarg));
+      LOG_INFO(std::string("Using config file: ").append(optarg));
       optval.confpath = optarg;
       break;
 
@@ -98,12 +99,14 @@ int main(int argc, char *const argv[]) {
     }
     LOG_FATAL(os.str());
     exit(EXIT_FAILURE);
+  } catch (std::invalid_argument &ex) {
+    LOG_FATAL(ex.what());
   }
 
   tinydhcpd::Daemon daemon(optval.address, optval.interface,
                            optval.subnet_config, optval.lease_file_path);
   daemon.main_loop();
   daemon.write_leases();
-  LOG_DEBUG("Finished");
+  LOG_INFO("Finished");
   return 0;
 }

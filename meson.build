@@ -27,6 +27,10 @@ if get_option('use_systemd')
   endif
 endif
 
+if get_option('debug')
+  args += '-DENABLE_TRACE'  
+endif
+
 executable('tinydhcpd', 'src/main.cpp', 'src/daemon.cpp', 'src/socket.cpp', 'src/datagram.cpp', 'src/configuration.cpp', 'src/bytemanip.cpp', 'src/log/logger.cpp',
     cpp_args: args,
     dependencies: dependencies)

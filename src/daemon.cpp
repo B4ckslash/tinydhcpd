@@ -11,6 +11,7 @@
 
 #include "bytemanip.hpp"
 #include "datagram.hpp"
+#include "log/logger.hpp"
 #include "string-format.hpp"
 
 namespace tinydhcpd {
@@ -37,8 +38,7 @@ Daemon::Daemon(const struct in_addr &address, const std::string &iface_name,
       lease_file(lease_file_path, std::fstream::in | std::fstream::out),
       active_leases() {
   if (!lease_file.is_open()) {
-    std::cerr << "The lease file does not exist! Creating a new one..."
-              << std::endl;
+    LOG_WARN("The lease file does not exist! Creating a new one...");
     lease_file =
         std::fstream(lease_file_path, std::fstream::in | std::fstream::out |
                                           std::fstream::trunc);
@@ -52,43 +52,53 @@ Daemon::Daemon(const struct in_addr &address, const std::string &iface_name,
 void Daemon::main_loop() { epoll_socket.poll_loop(); }
 
 void Daemon::handle_recv(DhcpDatagram &datagram) {
-  std::cout << string_format("XID: %#010x", datagram.transaction_id)
-            << std::endl;
+  std::ostringstream os;
+  os << "Received packet from ";
+  for (int i = 0; i < datagram.hwaddr_len; i++) {
+    os << string_format("%x", datagram.hw_addr[i]) << ":";
+  }
+  LOG_DEBUG(os.str());
+  LOG_TRACE(string_format("XID: %#010x", datagram.transaction_id));
   if (datagram.opcode != 0x1) {
     return;
   }
   std::for_each(datagram.options.begin(), datagram.options.end(),
                 [](const auto &option) {
-                  std::cout << string_format("Tag %u | Length %u | Value(s) ",
-                                             static_cast<uint8_t>(option.first),
-                                             option.second.size());
+                  std::ostringstream os;
+                  os << string_format("Tag %u | Length %u | Value(s) ",
+                                      static_cast<uint8_t>(option.first),
+                                      option.second.size());
                   for (uint8_t val_byte : option.second) {
-                    std::cout << string_format("%#04x ", val_byte);
+                    os << string_format("%#04x ", val_byte);
                   }
-                  std::cout << std::endl;
+                  LOG_TRACE(os.str());
                 });
 
   switch (datagram.options[OptionTag::DHCP_MESSAGE_TYPE].at(0)) {
   case DHCP_TYPE_DISCOVER:
+    LOG_DEBUG("DISCOVER");
     handle_discovery(datagram);
     break;
   case DHCP_TYPE_REQUEST:
+    LOG_DEBUG("REQUEST");
     handle_request(datagram);
     break;
   case DHCP_TYPE_RELEASE:
+    LOG_DEBUG("RELEASE");
     handle_release(datagram);
     break;
   case DHCP_TYPE_INFORM:
+    LOG_DEBUG("INFORM");
     handle_inform(datagram);
     break;
   case DHCP_TYPE_DECLINE:
+    LOG_DEBUG("DECLINE");
     handle_decline(datagram);
     break;
   default:
-    std::cerr << string_format(
-                     "Invalid message type: %x",
-                     datagram.options[OptionTag::DHCP_MESSAGE_TYPE].at(0))
-              << std::endl;
+    LOG_WARN(
+        string_format("Invalid message type: %x",
+                      datagram.options[OptionTag::DHCP_MESSAGE_TYPE].at(0)));
   }
 }
 
@@ -130,6 +140,7 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
           offer_address_host_order++;
         }
         if (offer_address_host_order >= range_end_host_order) {
+          LOG_ERROR("Failed to find free address!");
           return;
         } else {
           break;
@@ -141,6 +152,8 @@ void Daemon::handle_discovery(const DhcpDatagram &datagram) {
     }
   }
   in_addr_t offer_address_netorder = htonl(offer_address_host_order);
+  LOG_DEBUG(string_format("Offering address %s",
+                          inet_ntoa({.s_addr = offer_address_netorder})));
 
   reply.assigned_ip = offer_address_host_order;
   reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_OFFER};
@@ -175,9 +188,11 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
   DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
   if ((requested_address_netorder & netconfig.netmask.s_addr) !=
       netconfig.subnet_address.s_addr) {
-    std::cerr << "Requested address "
-              << inet_ntoa(in_addr{.s_addr = requested_address_netorder})
-              << " is not in the configured subnet!" << std::endl;
+    std::ostringstream os;
+    os << "Requested address "
+       << inet_ntoa(in_addr{.s_addr = requested_address_netorder})
+       << " is not in the configured subnet!";
+    LOG_WARN(os.str());
     reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_NAK};
     struct sockaddr_in dest = get_reply_destination(datagram, INADDR_ANY);
     socket.enqueue_datagram(dest, reply);
@@ -205,9 +220,13 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
       struct sockaddr_in destination =
           get_reply_destination(datagram, requested_address_netorder);
 
+      LOG_DEBUG(string_format(
+          "Assigned IP %s", inet_ntoa({.s_addr = requested_address_netorder})));
+
       socket.enqueue_datagram(destination, reply);
     } else {
       // if somebody else holds this lease, we tell the client to reset
+      LOG_DEBUG("Requested address already in use");
       reply.options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_NAK};
       struct sockaddr_in dest = get_reply_destination(datagram, INADDR_ANY);
       socket.enqueue_datagram(dest, reply);
@@ -263,9 +282,9 @@ Daemon::get_reply_destination(const DhcpDatagram &request_datagram,
     std::memcpy(&ireq.ifr_name, request_datagram.recv_iface.c_str(),
                 request_datagram.recv_iface.length() + 1);
     if (ioctl(socket, SIOCGIFBRDADDR, &ireq) != 0) {
-      std::cerr << "Failed to get broadcast address! Falling back to manual "
-                   "calculation. Error: "
-                << errno << std::endl;
+      LOG_ERROR(string_format("Failed to get broadcast address! Falling back "
+                              "to manual calculation. Error: %d",
+                              errno));
       destination.sin_addr.s_addr =
           (request_datagram.recv_addr | ~netconfig.netmask.s_addr);
     } else {
@@ -290,7 +309,8 @@ Daemon::get_reply_destination(const DhcpDatagram &request_datagram,
     std::memcpy(&areq.arp_dev, request_datagram.recv_iface.c_str(),
                 request_datagram.recv_iface.length() + 1);
     if (ioctl(socket, SIOCSARP, &areq) != 0)
-      std::cerr << "Failed to inject into arp cache!" << errno << std::endl;
+      LOG_ERROR(
+          string_format("Failed to inject into arp cache! Error: %d", errno));
   }
   return destination;
 }
@@ -325,14 +345,22 @@ void Daemon::set_requested_options(const DhcpDatagram &request,
   for (uint8_t option : request.options.at(OptionTag::PARAMETER_REQUEST_LIST)) {
     if (!netconfig.defined_options.contains(static_cast<OptionTag>(option)) ||
         reply.options.contains(static_cast<OptionTag>(option))) {
+      LOG_TRACE(string_format("No configured value for option %x", option));
       continue;
     }
     reply.options[static_cast<OptionTag>(option)] =
         netconfig.defined_options.at(static_cast<OptionTag>(option));
+    std::ostringstream os;
+    os << string_format("Set value for option %x to ", option);
+    for (auto &elem : reply.options[static_cast<OptionTag>(option)]) {
+      os << string_format("%x", elem);
+    }
+    LOG_DEBUG(os.str());
   }
 }
 
 void Daemon::update_leases() {
+  LOG_TRACE("Updating leases");
   const uint64_t current_time_seconds = get_current_time();
   for (auto map_iter = active_leases.cbegin();
        map_iter != active_leases.cend();) {
@@ -347,16 +375,17 @@ void Daemon::update_leases() {
 void Daemon::load_leases() {
   std::string current_line;
   const uint64_t current_time_seconds = get_current_time();
-  std::cout << "Reading leases... at " << current_time_seconds << std::endl;
+  LOG_DEBUG("Reading leases from file...");
 
   while (std::getline(lease_file, current_line)) {
-    std::cout << current_line << std::endl;
+    LOG_TRACE(current_line);
     size_t first_delim_pos = current_line.find_first_of(LEASE_FILE_DELIMITER);
     size_t last_delim_pos = current_line.find_last_of(LEASE_FILE_DELIMITER);
 
     if (first_delim_pos == std::string::npos ||
         last_delim_pos == std::string::npos) {
-      std::cerr << "Invalid entry in lease file: " << current_line << std::endl;
+      LOG_WARN(string_format("Invalid entry in lease file: %s", current_line));
+      continue;
     }
 
     std::string hwaddr_string = current_line.substr(0, first_delim_pos);
@@ -368,8 +397,10 @@ void Daemon::load_leases() {
             .c_str(),
         nullptr, 10);
 
-    std::cout << "IP: " << ipaddr_string << " | Ether: " << hwaddr_string
-              << " | Timestamp: " << timeout_timestamp << std::endl;
+    std::ostringstream os;
+    os << "IP: " << ipaddr_string << " | Ether: " << hwaddr_string
+       << " | Timestamp: " << timeout_timestamp;
+    LOG_DEBUG(os.str());
     if (timeout_timestamp < current_time_seconds) {
       continue;
     }
@@ -395,6 +426,7 @@ void Daemon::load_leases() {
 void Daemon::write_leases() {
   lease_file.seekg(0);
   struct in_addr ip_addr;
+  LOG_DEBUG("Writing leases to file");
   for (auto const &[hwaddr, value_pair] : active_leases) {
     for (const uint8_t &octet : hwaddr) {
       lease_file << string_format("%x", octet) << ":";

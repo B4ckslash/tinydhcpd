@@ -1,5 +1,6 @@
 #include "datagram.hpp"
 
+#include "log/logger.hpp"
 #include "string-format.hpp"
 
 namespace tinydhcpd {
@@ -51,8 +52,9 @@ DhcpDatagram DhcpDatagram::from_buffer(uint8_t *buffer, size_t buflen) {
             datagram.hw_addr.begin());
   uint32_t cookie = ntohl(*(uint32_t *)(buffer + MAGIC_COOKIE_OFFSET));
   if (cookie != DHCP_MAGIC_COOKIE) {
-    std::cout << cookie << " expected " << DHCP_MAGIC_COOKIE << std::endl;
-    throw std::runtime_error("Not a DHCP message!");
+    LOG_DEBUG(string_format("DHCP cookie: got %x | expected %x", cookie,
+                            DHCP_MAGIC_COOKIE));
+    LOG_WARN("Not a DHCP message!");
   }
 
   datagram.options =
