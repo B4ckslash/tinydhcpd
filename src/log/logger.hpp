@@ -3,27 +3,34 @@
 #include "logsink.hpp"
 #include <memory>
 
-#define LOG(Logger_, Message_)                                                 \
+#define LOG(Logger_, Message_, Level_)                                         \
   Logger_(static_cast<std::ostringstream &>(std::ostringstream().flush()       \
                                             << Message_)                       \
-              .str())
+              .str(),                                                          \
+          Level_)
 #ifndef LOG_TRACE
-#define LOG_TRACE(Message_) LOG(tinydhcpd::TraceLogger(), Message_)
+#define LOG_TRACE(Message_)                                                    \
+  LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::TRACE)
 #endif
 #ifndef LOG_DEBUG
-#define LOG_DEBUG(Message_) LOG(tinydhcpd::DebugLogger(), Message_)
+#define LOG_DEBUG(Message_)                                                    \
+  LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::DEBUG)
 #endif
 #ifndef LOG_INFO
-#define LOG_INFO(Message_) LOG(tinydhcpd::InfoLogger(), Message_)
+#define LOG_INFO(Message_)                                                     \
+  LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::INFO)
 #endif
 #ifndef LOG_WARN
-#define LOG_WARN(Message_) LOG(tinydhcpd::WarningLogger(), Message_)
+#define LOG_WARN(Message_)                                                     \
+  LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::WARN)
 #endif
 #ifndef LOG_ERROR
-#define LOG_ERROR(Message_) LOG(tinydhcpd::ErrorLogger(), Message_)
+#define LOG_ERROR(Message_)                                                    \
+  LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::ERROR)
 #endif
 #ifndef LOG_FATAL
-#define LOG_FATAL(Message_) LOG(tinydhcpd::FatalLogger(), Message_)
+#define LOG_FATAL(Message_)                                                    \
+  LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::INFO)
 #endif
 
 namespace tinydhcpd {
@@ -32,36 +39,15 @@ extern std::unique_ptr<LogSink> global_sink;
 
 class Logger {
 private:
-  Level lvl;
   const LogSink &sink;
 
 public:
-  Logger(const LogSink &sink, const Level level = INFO);
-  void operator()(const std::string &message);
+  Logger(const LogSink &sink);
+  void operator()(const std::string &message, const Level level);
 };
 
-static Logger &TraceLogger() {
-  static Logger logger(*global_sink, Level::TRACE);
+static Logger &LogInstance() {
+  static Logger logger(*global_sink);
   return logger;
-}
-static Logger &DebugLogger() {
-  static Logger logger(*global_sink, Level::DEBUG);
-  return logger;
-}
-static Logger &InfoLogger() {
-  static Logger logger(*global_sink, Level::INFO);
-  return logger;
-}
-static Logger &WarningLogger() {
-  static Logger logger(*global_sink, Level::WARN);
-  return logger;
-}
-static Logger &ErrorLogger() {
-  static Logger logger(*global_sink, Level::ERROR);
-  return logger;
-}
-static Logger &FatalLogger() {
-  static Logger logger(*global_sink, Level::FATAL);
-  return logger;
-}
+};
 } // namespace tinydhcpd

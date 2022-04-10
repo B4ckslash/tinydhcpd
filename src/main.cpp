@@ -81,7 +81,7 @@ int main(int argc, char *const argv[]) {
   try {
     tinydhcpd::parse_configuration(optval);
   } catch (libconfig::ParseException &pex) {
-    LOG_ERROR(tinydhcpd::string_format(
+    LOG_FATAL(tinydhcpd::string_format(
         "Failed to parse config file %s at line %d! Error: %s", pex.getFile(),
         pex.getLine(), pex.getError()));
     exit(EXIT_FAILURE);
@@ -91,7 +91,7 @@ int main(int argc, char *const argv[]) {
     if (!std::filesystem::exists(optval.confpath)) {
       os << " The file does not exist.";
     }
-    LOG_ERROR(os.str());
+    LOG_FATAL(os.str());
     exit(EXIT_FAILURE);
   }
 
