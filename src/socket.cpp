@@ -1,5 +1,6 @@
 #include "socket.hpp"
 
+#include <arpa/inet.h>
 #include <net/if.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -7,6 +8,7 @@
 
 #include "bytemanip.hpp"
 #include "log/logger.hpp"
+#include "string-format.hpp"
 
 #define DGRAM_SIZE 576
 
@@ -35,8 +37,7 @@ Socket::Socket(const struct in_addr &address, const std::string &iface_name,
   if (!iface_name.empty()) {
     struct ifreq ireq {};
     ireq.ifr_addr.sa_family = AF_INET;
-    std::snprintf(ireq.ifr_name, sizeof(ireq.ifr_name), "%s",
-                  iface_name.c_str());
+    std::copy(iface_name.begin(), iface_name.end(), ireq.ifr_name);
     if (setsockopt(socket_fd, SOL_SOCKET, SO_BINDTODEVICE, (const void *)&ireq,
                    sizeof(ireq)) < 0) {
       std::string msg("Failed to bind to interface ");
@@ -44,6 +45,7 @@ Socket::Socket(const struct in_addr &address, const std::string &iface_name,
       msg.append(": ");
       die(msg);
     }
+    LOG_INFO(string_format("Binding to interface %s", iface_name.c_str()));
     if (server_ip == INADDR_ANY) {
       if (ioctl(socket_fd, SIOCGIFADDR, &ireq) < 0) {
         die("ioctl SIOCGIFADDR failed: ");
@@ -55,6 +57,10 @@ Socket::Socket(const struct in_addr &address, const std::string &iface_name,
   if (bind(socket_fd, (const sockaddr *)&listen_address,
            sizeof(listen_address)) == -1) {
     die("Failed to bind socket: ");
+  }
+  LOG_INFO(string_format("Listening on address %s",
+                         inet_ntoa({.s_addr = server_ip})));
+  if (!iface_name.empty()) {
   }
 }
 

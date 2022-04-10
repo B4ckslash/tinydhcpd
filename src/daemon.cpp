@@ -35,14 +35,7 @@ Daemon::Daemon(const struct in_addr &address, const std::string &iface_name,
                const std::string &lease_file_path) try
     : socket(address, iface_name, *this),
       epoll_socket(socket, (EPOLLIN | EPOLLOUT)), netconfig(netconfig),
-      lease_file(lease_file_path, std::fstream::in | std::fstream::out),
-      active_leases() {
-  if (!lease_file.is_open()) {
-    LOG_WARN("The lease file does not exist! Creating a new one...");
-    lease_file =
-        std::fstream(lease_file_path, std::fstream::in | std::fstream::out |
-                                          std::fstream::trunc);
-  }
+      lease_file_path(lease_file_path), active_leases() {
   load_leases();
 } catch (std::runtime_error &ex) {
   printf("%s\n", ex.what());
@@ -373,6 +366,12 @@ void Daemon::update_leases() {
 }
 
 void Daemon::load_leases() {
+  std::ifstream lease_file(lease_file_path);
+  if (!lease_file.is_open()) {
+    LOG_WARN("The lease file does not exist! Creating a new one...");
+    lease_file = std::ifstream(lease_file_path, std::fstream::trunc);
+  }
+
   std::string current_line;
   const uint64_t current_time_seconds = get_current_time();
   LOG_DEBUG("Reading leases from file...");
@@ -420,11 +419,13 @@ void Daemon::load_leases() {
     active_leases[hwaddr] =
         std::make_pair(ntohl(ip_addr.s_addr), timeout_timestamp);
   }
-  lease_file.clear();
+  lease_file.close();
 }
 
 void Daemon::write_leases() {
-  lease_file.seekg(0);
+  std::ofstream lease_file(lease_file_path);
+
+  update_leases();
   struct in_addr ip_addr;
   LOG_DEBUG("Writing leases to file");
   for (auto const &[hwaddr, value_pair] : active_leases) {

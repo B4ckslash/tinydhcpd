@@ -30,6 +30,11 @@ void parse_configuration(ProgramConfiguration &optval) {
     inet_aton(config_listen_address.c_str(), &(optval.address));
   }
 
+  if (optval.interface.empty()) {
+    optval.interface =
+        static_cast<std::string>(configuration.lookup(INTERFACE_KEY));
+  }
+
   if (!configuration.exists("subnet")) {
     throw std::invalid_argument("No subnet declaration found!");
   }

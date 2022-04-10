@@ -17,7 +17,7 @@ private:
   SubnetConfiguration netconfig;
   DhcpDatagram
   create_skeleton_reply_datagram(const DhcpDatagram &request_datagram);
-  std::fstream lease_file;
+  std::string lease_file_path;
   std::map<std::array<uint8_t, 16>, std::pair<in_addr_t, uint64_t>>
       active_leases;
   void load_leases();
