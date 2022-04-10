@@ -9,6 +9,7 @@
 #include "configuration.hpp"
 #include "daemon.hpp"
 #include "log/logger.hpp"
+#include "log/stdout_logsink.hpp"
 #include "socket.hpp"
 #include "string-format.hpp"
 
@@ -42,7 +43,11 @@ int main(int argc, char *const argv[]) {
   std::signal(SIGTERM, sighandler);
   std::signal(SIGHUP, sighandler);
 
+#ifdef HAVE_SYSTEMD
   tinydhcpd::global_sink.reset(new tinydhcpd::SystemdLogSink(std::cerr));
+#else
+  tinydhcpd::global_sink.reset(new tinydhcpd::StdoutLogsink());
+#endif
 
   LOG_INFO(
       tinydhcpd::string_format("tinydhcpd %s starting...", PROGRAM_VERSION));

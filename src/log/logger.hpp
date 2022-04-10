@@ -30,7 +30,7 @@
 #endif
 #ifndef LOG_FATAL
 #define LOG_FATAL(Message_)                                                    \
-  LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::INFO)
+  LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::FATAL)
 #endif
 
 namespace tinydhcpd {
