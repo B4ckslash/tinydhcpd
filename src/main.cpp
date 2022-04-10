@@ -105,6 +105,7 @@ int main(int argc, char *const argv[]) {
 
   tinydhcpd::Daemon daemon(optval.address, optval.interface,
                            optval.subnet_config, optval.lease_file_path);
+  LOG_INFO("Initialization finished");
   daemon.main_loop();
   daemon.write_leases();
   LOG_INFO("Finished");
