@@ -36,6 +36,7 @@ struct ProgramConfiguration {
   std::string interface;
   std::string confpath;
   std::string lease_file_path;
+  bool foreground;
   tinydhcpd::SubnetConfiguration subnet_config;
 };
 

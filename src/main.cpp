@@ -28,11 +28,13 @@ std::unique_ptr<tinydhcpd::Logger> tinydhcpd::global_logger;
 const char ADDRESS_TAG = 'a';
 const char IFACE_TAG = 'i';
 const char CONFIG_FILE_TAG = 'c';
+const char FOREGROUND_TAG = 'f';
 
 const struct option long_options[] = {
     {"address", required_argument, nullptr, ADDRESS_TAG},
     {"interface", required_argument, nullptr, IFACE_TAG},
     {"configfile", required_argument, nullptr, CONFIG_FILE_TAG},
+    {"foreground", no_argument, nullptr, FOREGROUND_TAG},
     {nullptr, 0, nullptr, 0}};
 
 void sighandler(int signum) {
@@ -56,10 +58,11 @@ int main(int argc, char *const argv[]) {
       .interface = "",
       .confpath = "/etc/tinydhcpd/tinydhcpd.conf",
       .lease_file_path = "/var/lib/tinydhcpd/leases",
+      .foreground = false,
       .subnet_config = {}};
 
   int opt;
-  while ((opt = getopt_long(argc, argv, "a:i:c:d:", long_options, nullptr)) !=
+  while ((opt = getopt_long(argc, argv, "a:i:c:f", long_options, nullptr)) !=
          -1) {
     switch (opt) {
     case ADDRESS_TAG:
@@ -76,6 +79,11 @@ int main(int argc, char *const argv[]) {
     case CONFIG_FILE_TAG:
       tinydhcpd::LOG_INFO(std::string("Using config file: ").append(optarg));
       optval.confpath = optarg;
+      break;
+
+    case FOREGROUND_TAG:
+      tinydhcpd::LOG_DEBUG("Running in foreground.");
+      optval.foreground = true;
       break;
 
     default:
@@ -106,8 +114,15 @@ int main(int argc, char *const argv[]) {
                            optval.subnet_config, optval.lease_file_path);
   tinydhcpd::LOG_INFO("Initialization finished");
 
-  tinydhcpd::global_logger.reset(
-      new tinydhcpd::Logger(*(new tinydhcpd::SyslogLogSink())));
+  if (!optval.foreground) {
+#ifdef HAVE_SYSTEMD
+    tinydhcpd::global_logger.reset(
+        new tinydhcpd::Logger(*(new tinydhcpd::SystemdLogSink(std::cerr))));
+#else
+    tinydhcpd::global_logger.reset(
+        new tinydhcpd::Logger(*(new tinydhcpd::SyslogLogSink())));
+#endif
+  }
   daemon.main_loop();
   daemon.write_leases();
   tinydhcpd::LOG_INFO("Finished");
