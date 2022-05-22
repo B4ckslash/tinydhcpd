@@ -5,7 +5,7 @@ namespace tinydhcpd {
 enum Level { TRACE = 0, DEBUG, INFO, WARN, ERROR, FATAL };
 
 class LogSink {
-private:
+protected:
   std::ostream &sink;
   virtual std::string format_message(const std::string &msg,
                                      Level level) const = 0;
