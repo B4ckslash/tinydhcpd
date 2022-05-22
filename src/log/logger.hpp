@@ -4,38 +4,7 @@
 #include <memory>
 #include <sstream>
 
-#define LOG(Logger_, Message_, Level_)                                         \
-  Logger_(static_cast<std::ostringstream &>(std::ostringstream().flush()       \
-                                            << Message_)                       \
-              .str(),                                                          \
-          Level_)
-#ifdef ENABLE_TRACE
-#define LOG_TRACE(Message_)                                                    \
-  LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::TRACE)
-#else
-#define LOG_TRACE(Message_)                                                    \
-  do {                                                                         \
-  } while (0)
-#endif
-
-#define LOG_DEBUG(Message_)                                                    \
-  LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::DEBUG)
-
-#define LOG_INFO(Message_)                                                     \
-  LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::INFO)
-
-#define LOG_WARN(Message_)                                                     \
-  LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::WARN)
-
-#define LOG_ERROR(Message_)                                                    \
-  LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::ERROR)
-
-#define LOG_FATAL(Message_)                                                    \
-  LOG(tinydhcpd::LogInstance(), Message_, tinydhcpd::Level::FATAL)
-
 namespace tinydhcpd {
-
-extern std::unique_ptr<LogSink> global_sink;
 
 class Logger {
 private:
@@ -46,8 +15,13 @@ public:
   void operator()(const std::string &message, const Level level);
 };
 
-static Logger &LogInstance() {
-  static Logger logger(*global_sink);
-  return logger;
-};
+extern std::unique_ptr<Logger> global_logger;
+
+void LOG(Logger &Logger, const std::string &message, Level &level);
+void LOG_TRACE(const std::string &msg);
+void LOG_DEBUG(const std::string &msg);
+void LOG_INFO(const std::string &msg);
+void LOG_WARN(const std::string &msg);
+void LOG_ERROR(const std::string &msg);
+void LOG_FATAL(const std::string &msg);
 } // namespace tinydhcpd

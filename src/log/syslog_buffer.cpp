@@ -28,4 +28,6 @@ std::ostream &operator<<(std::ostream &os, const SyslogPriority &prio) {
   static_cast<SyslogBuffer *>(os.rdbuf())->next_prio = static_cast<int>(prio);
   return os;
 }
+
+std::ostream syslog_stream(new SyslogBuffer("tinydhcpd", LOG_DAEMON));
 } // namespace tinydhcpd

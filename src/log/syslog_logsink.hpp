@@ -5,11 +5,10 @@
 #include <sstream>
 
 #include "logsink.hpp"
-#include "src/string-format.hpp"
 #include "syslog_buffer.hpp"
 
 namespace tinydhcpd {
-class SyslogLogsink : public LogSink {
+class SyslogLogSink : public LogSink {
 private:
   virtual std::string format_message(const std::string &msg,
                                      Level level) const override {
@@ -17,8 +16,7 @@ private:
     case TRACE:
       sink << SYSLOG_DEBUG;
       break;
-    case DEBUG:
-      sink << SYSLOG_DEBUG;
+    case DEBUG: // debug is default level
       break;
     case WARN:
       sink << SYSLOG_WARN;
@@ -39,7 +37,7 @@ private:
   }
 
 public:
-  SyslogLogsink() : LogSink(tinydhcpd::syslog_stream) {}
-  ~SyslogLogsink() {}
+  SyslogLogSink() : LogSink(tinydhcpd::syslog_stream) {}
+  ~SyslogLogSink() {}
 };
 } // namespace tinydhcpd

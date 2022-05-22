@@ -8,7 +8,7 @@
 #include "src/string-format.hpp"
 
 namespace tinydhcpd {
-class StdoutLogsink : public LogSink {
+class StdoutLogSink : public LogSink {
 private:
   const std::string FORMAT_RESET = "\033[0m";
   const std::string YELLOW = "\033[33m";
@@ -55,7 +55,7 @@ private:
   }
 
 public:
-  StdoutLogsink() : LogSink(std::cout) {}
-  ~StdoutLogsink() {}
+  StdoutLogSink() : LogSink(std::cout) {}
+  ~StdoutLogSink() {}
 };
 } // namespace tinydhcpd

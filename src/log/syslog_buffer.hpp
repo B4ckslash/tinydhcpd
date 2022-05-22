@@ -19,9 +19,13 @@ enum SyslogPriority {
   SYSLOG_DEBUG = LOG_DEBUG    // debug-level message
 };
 
+// undef macros that collide with log functions
+#undef LOG_INFO
+#undef LOG_DEBUG
+
 std::ostream &operator<<(std::ostream &os, const SyslogPriority &log_priority);
 
-class SyslogBuffer : public std::basic_streambuf<char, std::char_traits<char>> {
+class SyslogBuffer : public std::basic_streambuf<char> {
 public:
   explicit SyslogBuffer(const std::string ident, const int facility);
 
@@ -38,5 +42,5 @@ private:
   std::string ident;
 };
 
-std::ostream syslog_stream(new SyslogBuffer("tinydhcpd", LOG_DAEMON));
+extern std::ostream syslog_stream;
 } // namespace tinydhcpd

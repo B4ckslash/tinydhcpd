@@ -11,6 +11,7 @@
 #include "daemon.hpp"
 #include "log/logger.hpp"
 #include "log/stdout_logsink.hpp"
+#include "log/syslog_logsink.hpp"
 #include "socket.hpp"
 #include "string-format.hpp"
 
@@ -22,7 +23,7 @@
 #define PROGRAM_VERSION "debug"
 #endif
 
-std::unique_ptr<tinydhcpd::LogSink> tinydhcpd::global_sink;
+std::unique_ptr<tinydhcpd::Logger> tinydhcpd::global_logger;
 
 const char ADDRESS_TAG = 'a';
 const char IFACE_TAG = 'i';
@@ -35,7 +36,7 @@ const struct option long_options[] = {
     {nullptr, 0, nullptr, 0}};
 
 void sighandler(int signum) {
-  LOG_TRACE("Caught signal " + std::to_string(signum));
+  tinydhcpd::LOG_TRACE("Caught signal " + std::to_string(signum));
   tinydhcpd::last_signal = signum;
 }
 
@@ -44,13 +45,10 @@ int main(int argc, char *const argv[]) {
   std::signal(SIGTERM, sighandler);
   std::signal(SIGHUP, sighandler);
 
-#ifdef HAVE_SYSTEMD
-  tinydhcpd::global_sink.reset(new tinydhcpd::SystemdLogSink(std::cerr));
-#else
-  tinydhcpd::global_sink.reset(new tinydhcpd::StdoutLogsink());
-#endif
+  tinydhcpd::global_logger.reset(
+      new tinydhcpd::Logger(*(new tinydhcpd::StdoutLogSink())));
 
-  LOG_INFO(
+  tinydhcpd::LOG_INFO(
       tinydhcpd::string_format("tinydhcpd %s starting...", PROGRAM_VERSION));
 
   tinydhcpd::ProgramConfiguration optval = {
@@ -65,17 +63,18 @@ int main(int argc, char *const argv[]) {
          -1) {
     switch (opt) {
     case ADDRESS_TAG:
-      LOG_INFO(std::string("Address from cmdline: ").append(optarg));
+      tinydhcpd::LOG_INFO(std::string("Address from cmdline: ").append(optarg));
       inet_aton(optarg, &(optval.address));
       break;
 
     case IFACE_TAG:
-      LOG_INFO(std::string("Interface from cmdline: ").append(optarg));
+      tinydhcpd::LOG_INFO(
+          std::string("Interface from cmdline: ").append(optarg));
       optval.interface = optarg;
       break;
 
     case CONFIG_FILE_TAG:
-      LOG_INFO(std::string("Using config file: ").append(optarg));
+      tinydhcpd::LOG_INFO(std::string("Using config file: ").append(optarg));
       optval.confpath = optarg;
       break;
 
@@ -87,7 +86,7 @@ int main(int argc, char *const argv[]) {
   try {
     tinydhcpd::parse_configuration(optval);
   } catch (libconfig::ParseException &pex) {
-    LOG_FATAL(tinydhcpd::string_format(
+    tinydhcpd::LOG_FATAL(tinydhcpd::string_format(
         "Failed to parse config file %s at line %d! Error: %s", pex.getFile(),
         pex.getLine(), pex.getError()));
     exit(EXIT_FAILURE);
@@ -97,17 +96,20 @@ int main(int argc, char *const argv[]) {
     if (!std::filesystem::exists(optval.confpath)) {
       os << " The file does not exist.";
     }
-    LOG_FATAL(os.str());
+    tinydhcpd::LOG_FATAL(os.str());
     exit(EXIT_FAILURE);
   } catch (std::invalid_argument &ex) {
-    LOG_FATAL(ex.what());
+    tinydhcpd::LOG_FATAL(ex.what());
   }
 
   tinydhcpd::Daemon daemon(optval.address, optval.interface,
                            optval.subnet_config, optval.lease_file_path);
-  LOG_INFO("Initialization finished");
+  tinydhcpd::LOG_INFO("Initialization finished");
+
+  tinydhcpd::global_logger.reset(
+      new tinydhcpd::Logger(*(new tinydhcpd::SyslogLogSink())));
   daemon.main_loop();
   daemon.write_leases();
-  LOG_INFO("Finished");
+  tinydhcpd::LOG_INFO("Finished");
   return 0;
 }

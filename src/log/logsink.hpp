@@ -14,7 +14,8 @@ public:
   LogSink(std::ostream &sink) : sink(sink) {}
 
   void write(const std::string &msg, Level level) const {
-    sink << format_message(msg, level) << std::endl;
+    const std::string formatted = format_message(msg, level);
+    sink << formatted << std::endl;
   }
   virtual ~LogSink() {}
 };
