@@ -4,12 +4,16 @@
 #include <fstream>
 #include <netinet/in.h>
 
+#include "configuration.hpp"
 #include "epoll.hpp"
 #include "socket.hpp"
 #include "socket_observer.hpp"
 #include "subnet_config.hpp"
 
 namespace tinydhcpd {
+
+void sighandler(int signum);
+
 class Daemon : SocketObserver {
 private:
   Socket socket;
@@ -39,6 +43,7 @@ public:
   virtual void handle_recv(DhcpDatagram &datagram) override;
   void main_loop();
   void write_leases();
+  void daemonize(const DAEMON_TYPE type);
 };
 
 } // namespace tinydhcpd

@@ -2,8 +2,8 @@ project('tinydhcpd', 'cpp',
     default_options : ['cpp_std=c++20', 'b_lto=true'],
     version: '0.0.1')
 
-args = ['-Wall', '-Wextra', '-Werror=return-type', '-DPROGRAM_VERSION="@0@"'.format(meson.project_version())]
-dependencies = [dependency('libconfig++')]
+args = ['-Wall', '-Wextra', '-Werror=return-type', '-DPROGRAM_VERSION="@0@"'.format(meson.project_version()), '-lcap']
+dependencies = [dependency('libconfig++'), dependency('libcap')]
 
 if meson.is_cross_build()
   libc_type = meson.get_external_property('libc', 'glibc').to_lower()

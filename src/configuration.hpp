@@ -1,3 +1,5 @@
+#pragma once
+
 #include <libconfig.h++>
 #include <netinet/in.h>
 
@@ -33,9 +35,9 @@ const std::map<std::string, OptionTag> key_tag_mapping = {
 
 enum DAEMON_TYPE {
 #ifdef HAVE_SYSTEMD
-    SYSTEMD,
+  SYSTEMD,
 #endif
-    SYSV
+  SYSV
 };
 
 struct ProgramConfiguration {
@@ -44,7 +46,7 @@ struct ProgramConfiguration {
   std::string confpath;
   std::string lease_file_path;
   bool foreground;
-  DAEMON_TYPE daemon_type; 
+  DAEMON_TYPE daemon_type;
   tinydhcpd::SubnetConfiguration subnet_config;
 };
 

@@ -13,12 +13,27 @@ most common DHCP options.
 ### Building
 To compile and run `tinydhcpd`, you need the following:
 
-- Linux with `epoll` support
+- Linux with `epoll` & `close_range` support (>5.9)
 - [libconfig++](https://github.com/hyperrealm/libconfig)
-  - Ubuntu: `apt install libconfig++-dev`
-  - Gentoo: `emerge libconfig`
-- [Meson](https://mesonbuild.com/)
+- [libcap](https://sites.google.com/site/fullycapable/Home)
+- [Meson](https://mesonbuild.com/) & (optionally) [Ninja](https://ninja-build.org/)
 - A compiler supporting C++20 designated initializers (GCC 8 or later, Clang 10 or later)
+
+To install the necessary dependencies, you can use the following commands:
+  
+  Ubuntu: 
+  ```
+  # apt install build-essential libconfig++-dev libcap-dev meson ninja-build 
+  ```
+  Gentoo: 
+  ```
+  # emerge libconfig libcap meson ninja
+  ```
+  Fedora:
+  ```
+  # dnf install gcc-c++ libconfig-devel libcap-devel meson ninja-build
+  ```
+
 
 To compile, execute the following in the root of the repository:
 ```bash
@@ -36,6 +51,8 @@ Currently, the following commandline options are available:
 -a, --address <address>      Listen on address <address>
 -i, --interface <iface>      Bind to interface <iface>
 -c, --configfile <file>      Use <file> instead of the default config file
+-d, --debug                  Change log level to DEBUG
+-f, --foreground             Don't fork to background
 ```
 ## Why another DHCP server?
 
@@ -48,4 +65,4 @@ The inability to properly cross-compile and/or use the above programs strictly f
 - Implement a standards-conform DHCP server
 - Allow for easy cross-compilation
 - Explicitly support smaller/alternative libc implementations (like musl-libc)
-- Ideally minimize executable size (as of Apr 2022, the size-optimized stripped binary clocks in at just 64K)
+- Ideally minimize executable size (as of July 2022, the size-optimized stripped binary clocks in at just 80kB)

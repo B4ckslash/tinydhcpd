@@ -11,19 +11,12 @@
 #include "daemon.hpp"
 #include "log/logger.hpp"
 #include "log/stdout_logsink.hpp"
-#include "log/syslog_logsink.hpp"
 #include "socket.hpp"
 #include "string-format.hpp"
-
-#ifdef HAVE_SYSTEMD
-#include "log/systemd_logsink.hpp"
-#endif
 
 #ifndef PROGRAM_VERSION
 #define PROGRAM_VERSION "debug"
 #endif
-
-std::unique_ptr<tinydhcpd::Logger> tinydhcpd::global_logger;
 
 const char ADDRESS_TAG = 'a';
 const char IFACE_TAG = 'i';
@@ -47,15 +40,9 @@ const struct option long_options[] = {
     {"classic-daemon", no_argument, nullptr, SYSV_DAEMON_TAG},
     {nullptr, 0, nullptr, 0}};
 
-void sighandler(int signum) {
-  tinydhcpd::LOG_TRACE("Caught signal " + std::to_string(signum));
-  tinydhcpd::last_signal = signum;
-}
-
 int main(int argc, char *const argv[]) {
-  std::signal(SIGINT, sighandler);
-  std::signal(SIGTERM, sighandler);
-  std::signal(SIGHUP, sighandler);
+  std::signal(SIGINT, tinydhcpd::sighandler);
+  std::signal(SIGHUP, tinydhcpd::sighandler);
 
   tinydhcpd::global_logger.reset(
       new tinydhcpd::Logger(*(new tinydhcpd::StdoutLogSink())));
@@ -122,7 +109,7 @@ int main(int argc, char *const argv[]) {
     tinydhcpd::LOG_FATAL(tinydhcpd::string_format(
         "Failed to parse config file %s at line %d! Error: %s", pex.getFile(),
         pex.getLine(), pex.getError()));
-    exit(EXIT_FAILURE);
+    std::exit(EXIT_FAILURE);
   } catch (libconfig::FileIOException &fex) {
     std::ostringstream os;
     os << "Error reading file " << optval.confpath << ".";
@@ -130,7 +117,7 @@ int main(int argc, char *const argv[]) {
       os << " The file does not exist.";
     }
     tinydhcpd::LOG_FATAL(os.str());
-    exit(EXIT_FAILURE);
+    std::exit(EXIT_FAILURE);
   } catch (std::invalid_argument &ex) {
     tinydhcpd::LOG_FATAL(ex.what());
   }
@@ -139,19 +126,19 @@ int main(int argc, char *const argv[]) {
                            optval.subnet_config, optval.lease_file_path);
   tinydhcpd::LOG_INFO("Initialization finished");
 
-  if (!optval.foreground) {
-#ifdef HAVE_SYSTEMD
-    tinydhcpd::global_logger.reset(
-        new tinydhcpd::Logger(*(new tinydhcpd::SystemdLogSink(std::cerr))));
-#else
-    tinydhcpd::global_logger.reset(
-        new tinydhcpd::Logger(*(new tinydhcpd::SyslogLogSink())));
-#endif
-  } else {
-    tinydhcpd::LOG_INFO("Running in foreground.");
+  try {
+    if (!optval.foreground) {
+      daemon.daemonize(optval.daemon_type);
+    } else {
+      tinydhcpd::LOG_INFO("Running in foreground.");
+    }
+    std::signal(SIGTERM, tinydhcpd::sighandler);
+    daemon.main_loop();
+    daemon.write_leases();
+  } catch (std::runtime_error &e) {
+    tinydhcpd::LOG_FATAL(e.what());
+    std::exit(EXIT_FAILURE);
   }
-  daemon.main_loop();
-  daemon.write_leases();
   tinydhcpd::LOG_INFO("Finished");
   return 0;
 }

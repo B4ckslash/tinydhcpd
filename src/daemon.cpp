@@ -1,18 +1,30 @@
 #include "daemon.hpp"
 
-#include <arpa/inet.h>
 #include <algorithm>
+#include <arpa/inet.h>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
+#include <filesystem>
+#include <linux/close_range.h>
 #include <net/if.h>
 #include <netinet/in.h>
+#include <sys/capability.h>
 #include <sys/ioctl.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
 
 #include "bytemanip.hpp"
 #include "datagram.hpp"
 #include "log/logger.hpp"
+#include "log/syslog_logsink.hpp"
+#ifdef HAVE_SYSTEMD
+#include "log/systemd_logsink.hpp"
+#endif
+#include "src/socket.hpp"
 #include "string-format.hpp"
 
 namespace tinydhcpd {
@@ -31,6 +43,13 @@ constexpr uint16_t DHCP_CLIENT_PORT = 68;
 
 const std::string LEASE_FILE_DELIMITER = ",";
 
+std::unique_ptr<tinydhcpd::Logger> global_logger;
+
+void sighandler(int signum) {
+  tinydhcpd::LOG_TRACE("Caught signal " + std::to_string(signum));
+  tinydhcpd::last_signal = signum;
+}
+
 Daemon::Daemon(const struct in_addr &address, const std::string &iface_name,
                SubnetConfiguration &netconfig,
                const std::string &lease_file_path) try
@@ -40,7 +59,124 @@ Daemon::Daemon(const struct in_addr &address, const std::string &iface_name,
   load_leases();
 } catch (std::runtime_error &ex) {
   printf("%s\n", ex.what());
-  exit(EXIT_FAILURE);
+  std::exit(EXIT_FAILURE);
+}
+
+void Daemon::daemonize(const DAEMON_TYPE type) {
+  if (type == DAEMON_TYPE::SYSV) {
+    // 1. close all file descriptors besides std{in, out, err}
+    struct rlimit res_lim;
+    getrlimit(RLIMIT_NOFILE, &res_lim);
+    if (
+#ifdef __MUSL__
+        syscall(SYS_close_range, 3, res_lim.rlim_cur, CLOSE_RANGE_CLOEXEC)
+#else
+        close_range(3, res_lim.rlim_cur, CLOSE_RANGE_CLOEXEC)
+#endif
+        != 0) {
+      throw std::runtime_error(string_format(
+          "Failed to close file descriptors: %s", strerror(errno)));
+    }
+    // 2. reset all signal handlers
+    struct sigaction default_handler;
+    default_handler.sa_handler = SIG_DFL;
+    for (int i = 0; i < _NSIG; i++) {
+      sigaction(i, &default_handler, nullptr);
+    }
+    // 3. reset sig mask
+    sigset_t set;
+    sigemptyset(&set);
+    if (sigprocmask(SIG_SETMASK, &set, nullptr) < 0) {
+      throw std::runtime_error(
+          string_format("sigprocmask failed! Error %s", strerror(errno)));
+    }
+    // 4. reset env variables (none set)
+    // 5. do the forking
+    int pipefd[2];
+    pipe(pipefd);
+    pid_t child = fork();
+    if (child < 0) {
+      throw std::runtime_error(
+          string_format("Failed to fork! Error: %s", strerror(errno)));
+    } else if (child == 0) {
+      close(pipefd[0]);
+      uint8_t pipe_msgbuf[1] = {0};
+      // 6. start a new session to detach from terminals
+      setsid();
+      // 7. fork some more to prevent terminal re-attachment by accident
+      child = fork();
+      if (child < 0) {
+        write(pipefd[1], pipe_msgbuf, 1);
+        throw std::runtime_error(
+            string_format("Failed to fork! Error: %s", strerror(errno)));
+      } else if (child != 0) {
+        // 8. finish first child process
+        std::exit(EXIT_SUCCESS);
+      }
+      // now we're in the actual daemon, set logger accordingly
+      tinydhcpd::global_logger.reset(
+          new tinydhcpd::Logger(*(new tinydhcpd::SyslogLogSink())));
+      // if (getppid() != 1) {
+      //   write(pipefd[1], pipe_msgbuf, 1);
+      //   throw std::runtime_error(
+      //       "The daemon has not been reparented to PID 1!");
+      // }
+      //  9. connect std{in, out, err} to /dev/null
+      std::freopen("/dev/null", "r", stdin);
+      std::freopen("/dev/null", "w", stdout);
+      std::freopen("/dev/null", "w", stderr);
+      // 10. set umask to 0
+      umask(0);
+      // 11. cd to root to avoid accidental unmount blocking
+      std::filesystem::current_path("/");
+      // 12. write PID to file
+      const std::string pid_file_path = "/run/tinydhcpd.pid";
+      std::ofstream pid_file(pid_file_path, std::ios::trunc);
+      pid_file << getpid() << std::endl;
+      pid_file.close();
+      // 13. drop capabilities if necessary
+      const cap_t caps = cap_get_proc();
+      cap_flag_value_t flag_value;
+      const cap_value_t cap_array[] = {CAP_NET_ADMIN};
+      if (cap_get_flag(caps, cap_array[0], CAP_EFFECTIVE, &flag_value) < 0) {
+        LOG_WARN("Failed to get info about capability CAP_NET_ADMIN");
+      }
+      if (flag_value != CAP_SET) {
+        // assume process was started as root
+        cap_set_flag(caps, CAP_EFFECTIVE, 1, cap_array, CAP_SET);
+        if (cap_set_proc(caps) < 0) {
+          write(pipefd[1], pipe_msgbuf, 1);
+          throw std::runtime_error("Failed to get CAP_NET_ADMIN!");
+        }
+      }
+      if (getuid() == 0) {
+        setuid(300);
+      }
+      if (getgid() == 0) {
+        setgid(300);
+      }
+      // tell the parent that everything is OK
+      pipe_msgbuf[0] = 1;
+      write(pipefd[1], pipe_msgbuf, 1);
+      close(pipefd[1]);
+    } else {
+      close(pipefd[1]);
+      uint8_t pipe_recvbuf[1] = {0};
+      read(pipefd[0], pipe_recvbuf, 1);
+      if (pipe_recvbuf[0] == 1) {
+        std::exit(EXIT_SUCCESS);
+      } else {
+        LOG_ERROR("Error in child process!");
+        std::exit(EXIT_FAILURE);
+      }
+    }
+  }
+#ifdef HAVE_SYSTEMD
+  else {
+    tinydhcpd::global_logger.reset(
+        new tinydhcpd::Logger(*(new tinydhcpd::SystemdLogSink(std::cerr))));
+  }
+#endif
 }
 
 void Daemon::main_loop() { epoll_socket.poll_loop(); }
