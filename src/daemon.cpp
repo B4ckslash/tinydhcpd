@@ -1,6 +1,7 @@
 #include "daemon.hpp"
 
 #include <arpa/inet.h>
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
