@@ -1,7 +1,11 @@
 #include "logger.hpp"
 
 namespace tinydhcpd {
+#ifdef ENABLE_TRACE
 Level current_global_log_level = Level::TRACE;
+#else 
+Level current_global_log_level = Level::INFO;
+#endif
 
 Logger::Logger(const LogSink &sink) : sink(sink) {}
 

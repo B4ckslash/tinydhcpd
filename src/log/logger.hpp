@@ -6,6 +6,8 @@
 
 namespace tinydhcpd {
 
+extern Level current_global_log_level;
+
 class Logger {
 private:
   const LogSink &sink;

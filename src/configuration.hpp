@@ -31,12 +31,20 @@ const std::map<std::string, OptionTag> key_tag_mapping = {
     {OPTIONS_ROUTER_KEY, OptionTag::ROUTERS},
     {OPTIONS_DNS_SERVERS_KEY, OptionTag::DNS_SERVER}};
 
+enum DAEMON_TYPE {
+#ifdef HAVE_SYSTEMD
+    SYSTEMD,
+#endif
+    SYSV
+};
+
 struct ProgramConfiguration {
   struct in_addr address;
   std::string interface;
   std::string confpath;
   std::string lease_file_path;
   bool foreground;
+  DAEMON_TYPE daemon_type; 
   tinydhcpd::SubnetConfiguration subnet_config;
 };
 
