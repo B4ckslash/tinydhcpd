@@ -463,9 +463,9 @@ Daemon::create_skeleton_reply_datagram(const DhcpDatagram &request_datagram) {
                     ._server_ip = INADDR_ANY,
                     ._relay_agent_ip = INADDR_ANY,
                     ._recv_addr = 0x0,
-                    .recv_iface = "",
-                    .hw_addr = {},
-                    .options =
+                    ._recv_iface = "",
+                    ._hw_addr = {},
+                    ._options =
                         std::unordered_map<OptionTag, std::vector<uint8_t>>()};
   std::copy(request_datagram._hw_addr.begin(), request_datagram._hw_addr.end(),
             skel._hw_addr.begin());
@@ -477,17 +477,18 @@ void Daemon::set_requested_options(const DhcpDatagram &request,
   if (!request._options.contains(OptionTag::PARAMETER_REQUEST_LIST)) {
     return;
   }
-  for (uint8_t option : request.options.at(OptionTag::PARAMETER_REQUEST_LIST)) {
+  for (uint8_t option :
+       request._options.at(OptionTag::PARAMETER_REQUEST_LIST)) {
     if (!_netconfig.defined_options.contains(static_cast<OptionTag>(option)) ||
-        reply.options.contains(static_cast<OptionTag>(option))) {
+        reply._options.contains(static_cast<OptionTag>(option))) {
       LOG_TRACE(string_format("No configured value for option %x", option));
       continue;
     }
-    reply.options[static_cast<OptionTag>(option)] =
+    reply._options[static_cast<OptionTag>(option)] =
         _netconfig.defined_options.at(static_cast<OptionTag>(option));
     std::ostringstream os;
     os << string_format("Set value for option %x to ", option);
-    for (auto &elem : reply.options[static_cast<OptionTag>(option)]) {
+    for (auto &elem : reply._options[static_cast<OptionTag>(option)]) {
       os << string_format("%x", elem);
     }
     LOG_DEBUG(os.str());

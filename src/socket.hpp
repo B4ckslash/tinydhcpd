@@ -9,11 +9,11 @@
 namespace tinydhcpd {
 class Socket {
 private:
-  int socket_fd;
-  SocketObserver &observer;
-  const struct sockaddr_in listen_address;
-  in_addr_t server_ip;
-  std::queue<std::pair<struct sockaddr_in, DhcpDatagram>> send_queue;
+  int _socket_fd;
+  SocketObserver &_observer;
+  const struct sockaddr_in _listen_address;
+  in_addr_t _server_ip;
+  std::queue<std::pair<struct sockaddr_in, DhcpDatagram>> _send_queue;
   [[noreturn]] void die(std::string error_msg);
   std::pair<in_addr_t, std::string>
   extract_interface_info(struct msghdr &message_header);

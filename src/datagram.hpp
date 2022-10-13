@@ -31,25 +31,25 @@ enum struct OptionTag : uint8_t {
 };
 
 struct DhcpDatagram {
-  uint8_t opcode;
-  uint8_t hwaddr_type;
-  uint8_t hwaddr_len;
+  uint8_t _opcode;
+  uint8_t _hwaddr_type;
+  uint8_t _hwaddr_len;
 
-  uint32_t transaction_id;
-  uint16_t secs_passed;
-  uint16_t flags;
+  uint32_t _transaction_id;
+  uint16_t _secs_passed;
+  uint16_t _flags;
 
-  uint32_t client_ip;
-  uint32_t assigned_ip;
-  uint32_t server_ip;
-  uint32_t relay_agent_ip;
+  uint32_t _client_ip;
+  uint32_t _assigned_ip;
+  uint32_t _server_ip;
+  uint32_t _relay_agent_ip;
 
-  in_addr_t recv_addr;
-  std::string recv_iface;
+  in_addr_t _recv_addr;
+  std::string _recv_iface;
 
-  std::array<uint8_t, 16> hw_addr;
+  std::array<uint8_t, 16> _hw_addr;
 
-  std::unordered_map<OptionTag, std::vector<uint8_t>> options;
+  std::unordered_map<OptionTag, std::vector<uint8_t>> _options;
 
   static DhcpDatagram from_buffer(uint8_t *buffer, size_t buflen);
 
