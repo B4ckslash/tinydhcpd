@@ -4,6 +4,8 @@ Description=Tiny DHCP server on %i
 [Service]
 Type=simple
 ExecStart=@binary_path@/tinydhcpd --interface %i --configfile /@config_path@/tinydhcpd.conf --systemd
+CapabilityBoundingSet=CAP_NET_ADMIN
+NoNewPrivileges=true
 
 [Install]
 After=network.target
