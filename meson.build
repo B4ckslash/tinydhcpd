@@ -1,8 +1,8 @@
 project('tinydhcpd', 'cpp', 
-    default_options : ['cpp_std=c++20', 'b_lto=true'],
+    default_options : ['cpp_std=c++20', 'b_lto=true', 'prefix=/usr'],
     version: '0.0.1')
 
-args = ['-Wall', '-Wextra', '-Werror=return-type', '-DPROGRAM_VERSION="@0@"'.format(meson.project_version()), '-lcap']
+args = ['-Wall', '-Wextra', '-Werror=return-type', '-DPROGRAM_VERSION="@0@"'.format(meson.project_version())]
 dependencies = [dependency('libconfig++'), dependency('libcap')]
 
 if meson.is_cross_build()
@@ -24,6 +24,17 @@ if get_option('use_systemd')
   if libsystemd_dep.found()
     args += '-DHAVE_SYSTEMD'
     dependencies += libsystemd_dep
+    service_cfg = configuration_data({
+        'binary_path': get_option('prefix') / get_option('bindir'),
+        'config_path': get_option('sysconfdir')
+        })
+    configure_file(
+      configuration: service_cfg,
+      input: 'tinydhcpd@.service.in',
+      output: 'tinydhcpd@.service',
+      install: true,
+      install_dir: '/etc/systemd/system/'
+      )
   endif
 endif
 

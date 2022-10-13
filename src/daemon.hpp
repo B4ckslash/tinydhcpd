@@ -16,14 +16,14 @@ void sighandler(int signum);
 
 class Daemon : SocketObserver {
 private:
-  Socket socket;
-  Epoll<Socket> epoll_socket;
-  SubnetConfiguration netconfig;
+  Socket _socket;
+  Epoll<Socket> _epoll_socket;
+  SubnetConfiguration _netconfig;
+  std::string _lease_file_path;
+  std::map<std::array<uint8_t, 16>, std::pair<in_addr_t, uint64_t>>
+      _active_leases;
   DhcpDatagram
   create_skeleton_reply_datagram(const DhcpDatagram &request_datagram);
-  std::string lease_file_path;
-  std::map<std::array<uint8_t, 16>, std::pair<in_addr_t, uint64_t>>
-      active_leases;
   void load_leases();
   void update_leases();
   uint64_t get_current_time();

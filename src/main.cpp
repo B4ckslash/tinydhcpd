@@ -12,7 +12,12 @@
 #include "log/logger.hpp"
 #include "log/stdout_logsink.hpp"
 #include "socket.hpp"
+#include "src/log/syslog_logsink.hpp"
 #include "string-format.hpp"
+
+#ifdef HAVE_SYSTEMD
+#include "log/systemd_logsink.hpp"
+#endif
 
 #ifndef PROGRAM_VERSION
 #define PROGRAM_VERSION "debug"
@@ -22,7 +27,7 @@ const char ADDRESS_TAG = 'a';
 const char IFACE_TAG = 'i';
 const char CONFIG_FILE_TAG = 'c';
 const char FOREGROUND_TAG = 'f';
-const char DEBUG_TAG = 'd';
+const char VERBOSE_TAG = 'v';
 #ifdef HAVE_SYSTEMD
 const char SYSTEMD_DAEMON_TAG = 'n';
 #endif
@@ -33,22 +38,16 @@ const struct option long_options[] = {
     {"interface", required_argument, nullptr, IFACE_TAG},
     {"configfile", required_argument, nullptr, CONFIG_FILE_TAG},
     {"foreground", no_argument, nullptr, FOREGROUND_TAG},
-    {"debug", no_argument, nullptr, DEBUG_TAG},
+    {"debug", no_argument, nullptr, VERBOSE_TAG},
 #ifdef HAVE_SYSTEMD
-    {"systemd-daemon", no_argument, nullptr, SYSTEMD_DAEMON_TAG},
+    {"systemd", no_argument, nullptr, SYSTEMD_DAEMON_TAG},
 #endif
-    {"classic-daemon", no_argument, nullptr, SYSV_DAEMON_TAG},
+    {"sysv", no_argument, nullptr, SYSV_DAEMON_TAG},
     {nullptr, 0, nullptr, 0}};
 
 int main(int argc, char *const argv[]) {
   std::signal(SIGINT, tinydhcpd::sighandler);
   std::signal(SIGHUP, tinydhcpd::sighandler);
-
-  tinydhcpd::global_logger.reset(
-      new tinydhcpd::Logger(*(new tinydhcpd::StdoutLogSink())));
-
-  tinydhcpd::LOG_INFO(
-      tinydhcpd::string_format("tinydhcpd %s starting...", PROGRAM_VERSION));
 
   tinydhcpd::ProgramConfiguration optval = {
       .address = {.s_addr = INADDR_ANY},
@@ -64,7 +63,7 @@ int main(int argc, char *const argv[]) {
       .subnet_config = {}};
 
   int opt;
-  while ((opt = getopt_long(argc, argv, "a:i:c:fd", long_options, nullptr)) !=
+  while ((opt = getopt_long(argc, argv, "a:i:c:fv", long_options, nullptr)) !=
          -1) {
     switch (opt) {
     case ADDRESS_TAG:
@@ -83,7 +82,7 @@ int main(int argc, char *const argv[]) {
       optval.foreground = true;
       break;
 
-    case DEBUG_TAG:
+    case VERBOSE_TAG:
       tinydhcpd::current_global_log_level = tinydhcpd::Level::DEBUG;
       break;
 
@@ -92,6 +91,7 @@ int main(int argc, char *const argv[]) {
       break;
 
 #ifdef HAVE_SYSTEMD
+    case SYSTEMD_DAEMON_TAG:
       optval.daemon_type = tinydhcpd::DAEMON_TYPE::SYSTEMD;
       break;
 #endif
@@ -100,6 +100,22 @@ int main(int argc, char *const argv[]) {
       break;
     }
   }
+
+  if (optval.foreground) {
+    tinydhcpd::global_logger.reset(
+        new tinydhcpd::Logger(*(new tinydhcpd::StdoutLogSink())));
+  } else if (optval.daemon_type == tinydhcpd::DAEMON_TYPE::SYSV) {
+    tinydhcpd::global_logger.reset(
+        new tinydhcpd::Logger(*(new tinydhcpd::SyslogLogSink())));
+  }
+#ifdef HAVE_SYSTEMD
+  else {
+    tinydhcpd::global_logger.reset(
+        new tinydhcpd::Logger(*(new tinydhcpd::SystemdLogSink(std::cerr))));
+  }
+#endif
+  tinydhcpd::LOG_INFO(
+      tinydhcpd::string_format("tinydhcpd %s starting...", PROGRAM_VERSION));
 
   try {
     tinydhcpd::LOG_INFO(
