@@ -33,7 +33,7 @@ if get_option('use_systemd')
       input: 'tinydhcpd@.service.in',
       output: 'tinydhcpd@.service',
       install: true,
-      install_dir: '/etc/systemd/system/'
+      install_dir: '/lib/systemd/system/'
       )
   endif
 endif
