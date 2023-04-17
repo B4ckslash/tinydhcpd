@@ -30,7 +30,7 @@ if get_option('use_systemd')
         })
     configure_file(
       configuration: service_cfg,
-      input: 'tinydhcpd@.service.in',
+      input: 'templates/tinydhcpd@.service.in',
       output: 'tinydhcpd@.service',
       install: true,
       install_dir: '/lib/systemd/system/'
