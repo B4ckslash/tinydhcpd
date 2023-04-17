@@ -14,6 +14,7 @@
 #include "socket.hpp"
 #include "src/log/syslog_logsink.hpp"
 #include "string-format.hpp"
+#include "version.hpp"
 
 #ifdef HAVE_SYSTEMD
 #include "log/systemd_logsink.hpp"

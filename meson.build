@@ -1,9 +1,15 @@
-project('tinydhcpd', 'cpp', 
+project('tinydhcpd', 'cpp',
     default_options : ['cpp_std=c++20', 'b_lto=true', 'prefix=/usr'],
     version: '0.0.1')
 
-args = ['-Wall', '-Wextra', '-Werror=return-type', '-DPROGRAM_VERSION="@0@"'.format(meson.project_version())]
+args = ['-Wall', '-Wextra', '-Werror=return-type']
 dependencies = [dependency('libconfig++'), dependency('libcap')]
+
+version_header = vcs_tag(
+                 command: ['tools/getversion.sh', meson.source_root()],
+                 input: 'templates/version.hpp.in',
+                 output: 'version.hpp' 
+                 )
 
 if meson.is_cross_build()
   libc_type = meson.get_external_property('libc', 'glibc').to_lower()
@@ -42,6 +48,6 @@ if get_option('debug')
   args += '-DENABLE_TRACE'  
 endif
 
-executable('tinydhcpd', 'src/main.cpp', 'src/daemon.cpp', 'src/socket.cpp', 'src/datagram.cpp', 'src/configuration.cpp', 'src/bytemanip.cpp', 'src/log/logger.cpp', 'src/log/syslog_buffer.cpp',
+executable('tinydhcpd', 'src/main.cpp', 'src/daemon.cpp', 'src/socket.cpp', 'src/datagram.cpp', 'src/configuration.cpp', 'src/bytemanip.cpp', 'src/log/logger.cpp', 'src/log/syslog_buffer.cpp', version_header,
     cpp_args: args,
     dependencies: dependencies)

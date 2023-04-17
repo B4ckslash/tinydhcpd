@@ -1,0 +1,4 @@
+#pragma once
+#ifndef PROGRAM_VERSION
+#define PROGRAM_VERSION "@VCS_TAG@"
+#endif
