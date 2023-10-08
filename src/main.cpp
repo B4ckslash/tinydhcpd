@@ -4,14 +4,12 @@
 
 #include <csignal>
 #include <filesystem>
-#include <iostream>
 #include <stdexcept>
 
 #include "configuration.hpp"
 #include "daemon.hpp"
 #include "log/logger.hpp"
 #include "log/stdout_logsink.hpp"
-#include "socket.hpp"
 #include "src/log/syslog_logsink.hpp"
 #include "string-format.hpp"
 #include "version.hpp"
@@ -64,7 +62,7 @@ int main(int argc, char *const argv[]) {
       .subnet_config = {}};
 
   int opt;
-  while ((opt = getopt_long(argc, argv, "a:i:c:fv", long_options, nullptr)) !=
+  while ((opt = getopt_long(argc, argv, "a:i:c:fvo", long_options, nullptr)) !=
          -1) {
     switch (opt) {
     case ADDRESS_TAG:

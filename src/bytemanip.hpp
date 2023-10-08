@@ -1,7 +1,8 @@
 #pragma once
 
 #include <array>
-#include <iostream>
+#include <cstdint>
+#include <stdexcept>
 #include <vector>
 
 namespace tinydhcpd {

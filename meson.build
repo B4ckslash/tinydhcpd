@@ -50,4 +50,5 @@ endif
 
 executable('tinydhcpd', 'src/main.cpp', 'src/daemon.cpp', 'src/socket.cpp', 'src/datagram.cpp', 'src/configuration.cpp', 'src/bytemanip.cpp', 'src/log/logger.cpp', 'src/log/syslog_buffer.cpp', version_header,
     cpp_args: args,
-    dependencies: dependencies)
+    dependencies: dependencies,
+    install: true)
