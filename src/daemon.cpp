@@ -9,8 +9,11 @@
 #include <cstring>
 #include <filesystem>
 #include <linux/close_range.h>
+#include <net/ethernet.h>
 #include <net/if.h>
+#include <netinet/ether.h>
 #include <netinet/in.h>
+#include <string>
 #include <sys/capability.h>
 #include <sys/ioctl.h>
 #include <sys/resource.h>
@@ -318,13 +321,14 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
     requested_address_hostorder = datagram._client_ip;
   }
   in_addr_t requested_address_netorder = htonl(requested_address_hostorder);
+  const std::string requested_address_string =
+      inet_ntoa(in_addr{.s_addr = requested_address_netorder});
 
   DhcpDatagram reply = create_skeleton_reply_datagram(datagram);
   if ((requested_address_netorder & _netconfig.netmask.s_addr) !=
-      _netconfig.subnet_address.s_addr) {
+      (_netconfig.subnet_address.s_addr & _netconfig.netmask.s_addr)) {
     std::ostringstream os;
-    os << "Requested address "
-       << inet_ntoa(in_addr{.s_addr = requested_address_netorder})
+    os << "Requested address " << requested_address_string
        << " is not in the configured subnet!";
     LOG_WARN(os.str());
     reply._options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_NAK};
@@ -332,7 +336,9 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
     _socket.enqueue_datagram(dest, reply);
     return;
   }
+
   update_leases();
+
   if (_active_leases.contains(datagram._hw_addr)) {
     if (_active_leases[datagram._hw_addr].first ==
         requested_address_hostorder) {
@@ -352,21 +358,20 @@ void Daemon::handle_request(const DhcpDatagram &datagram) {
           std::make_pair(requested_address_hostorder,
                          current_time_seconds + _netconfig.lease_time_seconds);
 
-      struct sockaddr_in destination =
-          get_reply_destination(datagram, requested_address_netorder);
-
-      LOG_DEBUG(string_format(
+      LOG_INFO(string_format(
           "Assigned IP %s", inet_ntoa({.s_addr = requested_address_netorder})));
-
-      _socket.enqueue_datagram(destination, reply);
     } else {
       // if somebody else holds this lease, we tell the client to reset
       LOG_DEBUG("Requested address already in use");
       reply._options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_NAK};
-      struct sockaddr_in dest = get_reply_destination(datagram, INADDR_ANY);
-      _socket.enqueue_datagram(dest, reply);
     }
+  } else {
+    LOG_WARN("Client requests address " + requested_address_string +
+             " without prior DHCPDISCOVER! Responding with NAK");
+    reply._options[OptionTag::DHCP_MESSAGE_TYPE] = {DHCP_TYPE_NAK};
   }
+  struct sockaddr_in dest = get_reply_destination(datagram, INADDR_ANY);
+  _socket.enqueue_datagram(dest, reply);
 }
 
 void Daemon::handle_release(const DhcpDatagram &datagram) {
