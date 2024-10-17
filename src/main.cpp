@@ -10,6 +10,7 @@
 #include "daemon.hpp"
 #include "log/logger.hpp"
 #include "log/stdout_logsink.hpp"
+#include "src/log/logsink.hpp"
 #include "src/log/syslog_logsink.hpp"
 #include "string-format.hpp"
 #include "version.hpp"
@@ -27,6 +28,7 @@ const char IFACE_TAG = 'i';
 const char CONFIG_FILE_TAG = 'c';
 const char FOREGROUND_TAG = 'f';
 const char VERBOSE_TAG = 'v';
+const char TRACE_TAG = 't';
 #ifdef HAVE_SYSTEMD
 const char SYSTEMD_DAEMON_TAG = 'n';
 #endif
@@ -42,6 +44,7 @@ const struct option long_options[] = {
     {"systemd", no_argument, nullptr, SYSTEMD_DAEMON_TAG},
 #endif
     {"sysv", no_argument, nullptr, SYSV_DAEMON_TAG},
+    {"trace", no_argument, nullptr, TRACE_TAG},
     {nullptr, 0, nullptr, 0}};
 
 int main(int argc, char *const argv[]) {
@@ -61,9 +64,15 @@ int main(int argc, char *const argv[]) {
 #endif
       .subnet_config = {}};
 
+#ifdef HAVE_SYSTEMD
+  const std::string shortopts = "a:i:c:fontv";
+#else
+  const std::string shortopts = "a:i:c:fotv";
+#endif // HAVE_SYSTEMD
+
   int opt;
-  while ((opt = getopt_long(argc, argv, "a:i:c:fvo", long_options, nullptr)) !=
-         -1) {
+  while ((opt = getopt_long(argc, argv, shortopts.c_str(), long_options,
+                            nullptr)) != -1) {
     switch (opt) {
     case ADDRESS_TAG:
       inet_aton(optarg, &(optval.address));
@@ -80,6 +89,12 @@ int main(int argc, char *const argv[]) {
     case FOREGROUND_TAG:
       optval.foreground = true;
       break;
+
+#ifdef ENABLE_TRACE
+    case TRACE_TAG:
+      tinydhcpd::current_global_log_level = tinydhcpd::Level::TRACE;
+      break;
+#endif // ENABLE_TRACE
 
     case VERBOSE_TAG:
       tinydhcpd::current_global_log_level = tinydhcpd::Level::DEBUG;
